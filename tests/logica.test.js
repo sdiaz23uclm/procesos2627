@@ -44,7 +44,7 @@ test('5. Usuario normal falla al intentar eliminar a otro usuario', async () => 
   await logica.registrarUsuario('user1@test.com', '123456');
   await logica.registrarUsuario('user2@test.com', '123456');
 
-  assert.throws(() => {
-    logica.eliminarUsuario('user1@test.com', 'user2@test.com', false);
+  await assert.rejects(async () => {
+    await logica.eliminarUsuario('user1@test.com', 'user2@test.com', false);
   }, /No tienes permisos/);
 });
