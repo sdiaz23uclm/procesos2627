@@ -1,9 +1,11 @@
+import bcrypt from 'bcryptjs';
+
 export class LogicaUsuarios {
   constructor(dao) {
     this.dao = dao;
   }
 
-  registrarUsuario(email, password, rol = "usuario") {
+  async registrarUsuario(email, password, rol = "usuario") {
     if (!email || !password) {
       throw new Error("Email y contraseña requeridos");
     }
@@ -11,14 +13,34 @@ export class LogicaUsuarios {
       throw new Error("El usuario ya existe");
     }
 
+    // Hash seguro de la contraseña (exigencia del apartado 5)
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
     const usuario = {
       email,
-      password, // En el Hito 2 aplicaremos hash
+      passwordHash,
       rol,
-      estado: "pendiente", // Confirmación por correo pendiente
+      estado: "pendiente", // Pendiente de confirmar por correo (Hito 4)
     };
 
     return this.dao.guardar(usuario);
+  }
+
+  async loginUsuario(email, password) {
+    const usuario = this.dao.obtenerPorEmail(email);
+    if (!usuario) {
+      throw new Error("Credenciales inválidas");
+    }
+
+    const passwordValida = await bcrypt.compare(password, usuario.passwordHash);
+    if (!passwordValida) {
+      throw new Error("Credenciales inválidas");
+    }
+
+    // En el Hito 1/2 inicial, si es local permitimos entrar aunque esté pendiente 
+    // (o puedes restringirlo si prefieres, pero Oauth/correo se afina en Hito 4).
+    return usuario;
   }
 
   listarUsuarios() {

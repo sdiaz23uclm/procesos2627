@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SaaS - Gestión de Usuarios</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .vista { display: none; }
+        .activa { display: block; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+
+    <h1>Mi Aplicación SaaS</h1>
+
+    <!-- VISTA DE LOGIN Y REGISTRO -->
+    <div id="auth-view" class="vista activa">
+        <h2>Iniciar Sesión</h2>
+        <form id="login-form">
+            <input type="email" id="login-email" placeholder="Email" required><br><br>
+            <input type="password" id="login-password" placeholder="Contraseña" required><br><br>
+            <button type="submit">Entrar</button>
+        </form>
+        <p id="login-error" class="error"></p>
+
+        <h2>Registro</h2>
+        <form id="register-form">
+            <input type="email" id="reg-email" placeholder="Email" required><br><br>
+            <input type="password" id="reg-password" placeholder="Contraseña" required><br><br>
+            <button type="submit">Registrarse</button>
+        </form>
+        <p id="reg-error" class="error"></p>
+        <p id="reg-success" style="color: green;"></p>
+    </div>
+
+    <!-- VISTA DEL PANEL PRIVADO -->
+    <div id="dashboard-view" class="vista">
+        <h2>Bienvenido al Panel</h2>
+        <p>Sesión iniciada como: <span id="user-email"></span></p>
+        <button id="logout-btn">Cerrar Sesión</button>
+    </div>
+
+    <!-- Importamos el cliente de comunicación -->
+    <script src="rest.js"></script>
+    <script>
+        const authView = document.getElementById('auth-view');
+        const dashboardView = document.getElementById('dashboard-view');
+        const userEmailSpan = document.getElementById('user-email');
+
+        function mostrarVista(vista) {
+            authView.classList.remove('activa');
+            dashboardView.classList.remove('activa');
+            vista.classList.add('activa');
+        }
+
+        // Comprobar sesión al cargar la página (mantenimiento de sesión entre recargas)
+        async function verificarSesionInicial() {
+            try {
+                const usuario = await RestClient.comprobarSesion();
+                if (usuario) {
+                    userEmailSpan.textContent = usuario.email;
+                    mostrarVista(dashboardView);
+                } else {
+                    mostrarVista(authView);
+                }
+            } catch (e) {
+                mostrarVista(authView);
+            }
+        }
+
+        // Manejo del Login
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            try {
+                const res = await RestClient.login(email, password);
+                userEmailSpan.textContent = res.email;
+                mostrarVista(dashboardView);
+            } catch (err) {
+                document.getElementById('login-error').textContent = err.message;
+            }
+        });
+
+        // Manejo del Registro
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            try {
+                await RestClient.registrar(email, password);
+                document.getElementById('reg-success').textContent = 'Registro exitoso. Cuenta pendiente de confirmar.';
+                document.getElementById('reg-error').textContent = '';
+            } catch (err) {
+                document.getElementById('reg-error').textContent = err.message;
+                document.getElementById('reg-success').textContent = '';
+            }
+        });
+
+        // Manejo del Logout
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            await RestClient.logout();
+            mostrarVista(authView);
+        });
+
+        // Ejecutar comprobación inicial al cargar
+        verificarSesionInicial();
+    </script>
+</body>
+</html>
