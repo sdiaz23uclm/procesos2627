@@ -47,6 +47,10 @@ export class LogicaUsuarios {
       console.log(`[LOG] Intento de login fallido - Contraseña incorrecta para: ${email}`);
       throw new Error("Credenciales inválidas");
     }
+    if (usuario.estado === 'pendiente') {
+      console.log(`[LOG] Intento de login fallido - email no verificado: ${email}`);
+      throw new Error('La cuenta está pendiente de confirmación.');
+    }
 
     console.log(`[LOG] Login exitoso: ${email}`);
     return usuario;
