@@ -37,6 +37,11 @@ export class LogicaUsuarios {
 
   async loginUsuario(email, password) {
     const usuario = await this.dao.obtenerPorEmail(email);
+    if (usuario.estado === 'pendiente') {
+      console.log(`[LOG] Intento de login fallido - email no verificado: ${email}`);
+      throw new Error('La cuenta está pendiente de confirmación.');
+    }
+    
     if (!usuario) {
       console.log(`[LOG] Intento de login fallido - Usuario no encontrado: ${email}`);
       throw new Error("Credenciales inválidas");
@@ -46,10 +51,6 @@ export class LogicaUsuarios {
     if (!passwordValida) {
       console.log(`[LOG] Intento de login fallido - Contraseña incorrecta para: ${email}`);
       throw new Error("Credenciales inválidas");
-    }
-    if (usuario.estado === 'pendiente') {
-      console.log(`[LOG] Intento de login fallido - email no verificado: ${email}`);
-      throw new Error('La cuenta está pendiente de confirmación.');
     }
 
     console.log(`[LOG] Login exitoso: ${email}`);
