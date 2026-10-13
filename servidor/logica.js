@@ -5,17 +5,23 @@ export class LogicaUsuarios {
     this.dao = dao;
   }
 
-  async registrarUsuario(email, password, rol = "usuario") {
+  async registrarUsuario(email, password, rolParam = "usuario") {
     if (!email || !password) {
       throw new Error("Email y contraseña requeridos");
     }
-    if (this.dao.obtenerPorEmail(email)) {
+
+    const existente = await this.dao.obtenerPorEmail(email);
+    if (existente) {
       throw new Error("El usuario ya existe");
     }
 
     // Hash seguro de la contraseña (exigencia del apartado 5)
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
+
+    // Si coincide con el email de administración configurado por variable de entorno, es admin
+    const adminEmailConfig = process.env.ADMIN_EMAIL;
+    const rol = (adminEmailConfig && email === adminEmailConfig) ? "admin" : rolParam;
 
     const usuario = {
       email,
@@ -24,39 +30,60 @@ export class LogicaUsuarios {
       estado: "pendiente", // Pendiente de confirmar por correo (Hito 4)
     };
 
-    return this.dao.guardar(usuario);
+    const guardado = await this.dao.guardar(usuario);
+    console.log(`[LOG] Usuario registrado con éxito: ${email} con rol [${rol}]`);
+    return guardado;
   }
 
   async loginUsuario(email, password) {
-    const usuario = this.dao.obtenerPorEmail(email);
+    const usuario = await this.dao.obtenerPorEmail(email);
     if (!usuario) {
+      console.log(`[LOG] Intento de login fallido - Usuario no encontrado: ${email}`);
       throw new Error("Credenciales inválidas");
     }
 
     const passwordValida = await bcrypt.compare(password, usuario.passwordHash);
     if (!passwordValida) {
+      console.log(`[LOG] Intento de login fallido - Contraseña incorrecta para: ${email}`);
       throw new Error("Credenciales inválidas");
     }
 
-    // En el Hito 1/2 inicial, si es local permitimos entrar aunque esté pendiente 
-    // (o puedes restringirlo si prefieres, pero Oauth/correo se afina en Hito 4).
+    console.log(`[LOG] Login exitoso: ${email}`);
     return usuario;
   }
 
-  listarUsuarios() {
-    return this.dao.obtenerTodos();
+  async listarUsuarios(usuarioActual) {
+    if (!usuarioActual || usuarioActual.rol !== 'admin') {
+      console.log(`[LOG] Acceso denegado a listado de usuarios para: ${usuarioActual?.email || 'anónimo'}`);
+      throw new Error("Acceso denegado: Se requiere rol de administrador");
+    }
+    console.log(`[LOG] El administrador ${usuarioActual.email} ha listado los usuarios.`);
+    return await this.dao.obtenerTodos();
   }
 
-  comprobarActivo(email) {
-    const u = this.dao.obtenerPorEmail(email);
+  async comprobarActivo(email) {
+    const u = await this.dao.obtenerPorEmail(email);
     if (!u) return false;
     return u.estado === "confirmado" || u.estado === "oauth";
   }
 
-  eliminarUsuario(emailSolicitante, emailTarget, esAdmin = false) {
+  async eliminarUsuario(emailSolicitante, emailTarget) {
+    const solicitante = await this.dao.obtenerPorEmail(emailSolicitante);
+    if (!solicitante) {
+      throw new Error("Usuario solicitante no válido");
+    }
+
+    const esAdmin = solicitante.rol === 'admin';
+
     if (!esAdmin && emailSolicitante !== emailTarget) {
+      console.log(`[LOG] El usuario ${emailSolicitante} intentó eliminar a ${emailTarget} sin permisos.`);
       throw new Error("No tienes permisos para eliminar este usuario");
     }
-    return this.dao.eliminar(emailTarget);
+
+    const eliminado = await this.dao.eliminar(emailTarget);
+    if (eliminado) {
+      console.log(`[LOG] Usuario eliminado: ${emailTarget} (por acción de ${emailSolicitante})`);
+    }
+    return eliminado;
   }
 }
