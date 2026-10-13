@@ -1,0 +1,10 @@
+{
+  "name": "procesos2627",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "servidor/api.js",
+  "scripts": {
+    "start": "node servidor/api.js",
+    "test": "node --test"
+  }
+}
