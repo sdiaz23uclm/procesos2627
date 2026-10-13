@@ -51,10 +51,20 @@ test('2. Error al registrar un email ya existente', async () => {
 });
 
 test('3. Inicio de sesión exitoso con credenciales correctas', async () => {
-  await logica.registrarUsuario('login@test.com', 'miPassword123');
-  const usuarioLogueado = await logica.loginUsuario('login@test.com', 'miPassword123');
+  const email = 'login@test.com';
+  const password = 'Password123*';
   
-  assert.strictEqual(usuarioLogueado.email, 'login@test.com');
+  // 1. Registrar el usuario (su estado inicial es 'pendiente')[cite: 1, 3]
+  await logica.registrarUsuario(email, password);
+  
+  // 2. Simulamos la confirmación cambiando el estado directamente en el DAO Mock[cite: 1, 2]
+  const usuarioEnDao = await daoMock.obtenerPorEmail(email);
+  usuarioEnDao.estado = 'confirmado'; // O 'activo', según lo que espere tu lógica[cite: 1, 3]
+
+  // 3. Ahora el login debe ser exitoso porque el estado ya no es 'pendiente'[cite: 1, 3]
+  const resultadoLogin = await logica.loginUsuario(email, password);
+  assert.ok(resultadoLogin);
+  assert.strictEqual(resultadoLogin.email, email);
 });
 
 test('4. Administrador puede listar todos los usuarios', async () => {
@@ -75,4 +85,17 @@ test('5. Usuario normal falla al intentar listar usuarios (Restricción de rol)'
   await assert.rejects(async () => {
     await logica.listarUsuarios(usuarioNormal);
   }, /Se requiere rol de administrador/);
+});
+
+test('6. Error al intentar iniciar sesión con una cuenta pendiente de confirmar', async () => {
+  const email = 'pendiente@test.com';
+  const password = 'Password123*';
+  
+  // 1. Registramos el usuario (por defecto su estado es 'pendiente')[cite: 1, 3]
+  await logica.registrarUsuario(email, password);
+  
+  // 2. Comprobamos que al hacer login sin confirmar la cuenta, lanza el error esperado
+  await assert.rejects(async () => {
+    await logica.loginUsuario(email, password);
+  }, /La cuenta está pendiente de confirmación/);
 });
