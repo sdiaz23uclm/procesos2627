@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 
 const dao = new BaseDatosMongoDB();
 const logica = new LogicaUsuarios(dao);
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // Almacenamiento simple de sesiones en memoria
 const sesionesActivas = new Map(); // sessionId -> emailUsuario
