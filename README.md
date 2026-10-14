@@ -25,3 +25,23 @@ Crea un archivo `.env` en la raíz del proyecto basándote en el archivo de ejem
 PORT=3000
 MONGODB_URI=tu_cadena_de_conexion_de_mongodb_atlas
 ADMIN_EMAIL=tu_correo_de_administrador@saas.com
+
+## Instalación y Ejecución
+
+1. Clona el repositorio e instálate las dependencias situándote en la raíz del proyecto:
+   ```bash
+   npm install
+
+    Configura tu archivo .env con los valores correspondientes (como se indica en la sección anterior).
+
+    Ejecución: Arranca el servidor ejecutando el siguiente comando en la raíz:
+
+    npm start
+
+    (Esto pondrá en marcha la aplicación, normalmente accesible en http://localhost:3000).
+
+Pruebas (Tests)
+
+Para ejecutar la suite de pruebas del proyecto, utiliza el comando:
+
+npm test
