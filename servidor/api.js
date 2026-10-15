@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { BaseDatosMongoDB } from './datos.js';
-import { LogicaUsuarios } from './logica.js';
+import { LogicaUsuarios, normalizarEmail } from './logica.js';
 
 // Cargar variables de entorno del archivo .env
 dotenv.config();
@@ -48,6 +48,37 @@ const server = http.createServer(async (req, res) => {
   // --- API ROUTES ---
   if (pathname.startsWith('/api/')) {
     res.setHeader('Content-Type', 'application/json');
+
+    // NORMALIZAR Y VALIDAR EMAIL
+    if (pathname === '/api/prueba/email' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        let datos;
+        try {
+          datos = JSON.parse(body);
+        } catch (err) {
+          if (!(err instanceof SyntaxError)) throw err;
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: 'EMAIL_INVALIDO' }));
+          return;
+        }
+
+        let emailNormalizado;
+        try {
+          emailNormalizado = normalizarEmail(datos?.email);
+        } catch (err) {
+          if (!(err instanceof Error) || err.message !== 'EMAIL_INVALIDO') throw err;
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: 'EMAIL_INVALIDO' }));
+          return;
+        }
+
+        res.writeHead(200);
+        res.end(JSON.stringify({ email: emailNormalizado }));
+      });
+      return;
+    }
 
     // REGISTRO
     if (pathname === '/api/registro' && req.method === 'POST') {

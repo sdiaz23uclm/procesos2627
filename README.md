@@ -45,3 +45,24 @@ Pruebas (Tests)
 Para ejecutar la suite de pruebas del proyecto, utiliza el comando:
 
 npm test
+
+## Variante 2: normalización y validación de email
+
+El endpoint público `POST /api/prueba/email` recibe un JSON con el campo `email`.
+Elimina los espacios exteriores, convierte el email a minúsculas y valida su formato.
+
+```json
+{"email": " Ana@X.com "}
+```
+
+Respuesta válida (`200`):
+
+```json
+{"email": "ana@x.com"}
+```
+
+Si el email falta, no es una cadena o no cumple el formato (`400`):
+
+```json
+{"error": "EMAIL_INVALIDO"}
+```
