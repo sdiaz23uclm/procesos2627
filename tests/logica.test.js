@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { test, beforeEach } from 'node:test';
-import { LogicaUsuarios } from '../servidor/logica.js';
+import { LogicaUsuarios, normalizarEmail } from '../servidor/logica.js';
 
 // Creamos un DAO simulado en memoria para las pruebas unitarias (evita depender de MongoDB externo en los tests)
 class DAOMock {
@@ -33,6 +33,23 @@ let daoMock;
 beforeEach(() => {
   daoMock = new DAOMock();
   logica = new LogicaUsuarios(daoMock);
+});
+
+test('variante2: normaliza espacios exteriores y mayúsculas del email', () => {
+  assert.strictEqual(normalizarEmail(' Ana@X.com '), 'ana@x.com');
+});
+
+test('variante2: rechaza emails que no cumplen el formato', () => {
+  for (const email of ['@x.com', 'a@@x.com', 'a@xcom', 'a@.x.com', 'a@x.com.', 'a b@x.com', null]) {
+    assert.throws(() => normalizarEmail(email), { message: 'EMAIL_INVALIDO' });
+  }
+});
+
+test('variante2: normaliza el email antes de registrar y buscar usuarios', async () => {
+  const usuario = await logica.registrarUsuario(' Ana@X.com ', '123456');
+  assert.strictEqual(usuario.email, 'ana@x.com');
+  assert.strictEqual(await daoMock.obtenerPorEmail('ana@x.com'), usuario);
+  assert.strictEqual(await logica.comprobarActivo(' ANA@X.COM '), false);
 });
 
 test('1. Registrar un usuario nuevo con éxito y contraseña hasheada', async () => {
