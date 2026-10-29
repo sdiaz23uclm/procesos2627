@@ -1,0 +1,37 @@
+# Cronología
+
+Del evento más reciente al más antiguo. Las referencias enlazan a commits y PR de este repositorio. Se consultó la lista de PR y el detalle de cada uno: los PR #1–#11 están integrados.
+
+- 2026-10-28 · Integración de [PR #11](https://github.com/sdiaz23uclm/procesos2627/pull/11); cambio de `.gitignore` para excluir `node_modules` · [commit de merge](https://github.com/sdiaz23uclm/procesos2627/commit/8627ff9)
+- 2026-10-28 · Cambio de `.gitignore` · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/9bed990)
+- 2026-10-15 · Integración de [PR #10](https://github.com/sdiaz23uclm/procesos2627/pull/10), normalización de email · [commit de merge](https://github.com/sdiaz23uclm/procesos2627/commit/59c9cf9)
+- 2026-10-15 · Implementación identificada en el mensaje como variante 2 de normalización de email · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/8f1526b)
+- 2026-10-15 · Commit en `main` para eliminar `node_modules`; no aparece asociado a un PR de la lista consultada. El commit identifica `web-flow` como committer, evidencia de creación mediante GitHub · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/5551fa0)
+- 2026-10-14 · Integración de [PR #9](https://github.com/sdiaz23uclm/procesos2627/pull/9) · [commit de merge](https://github.com/sdiaz23uclm/procesos2627/commit/fd5686c)
+- 2026-10-14 · Cambio del README según el mensaje del commit · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/02261b9)
+- 2026-10-14 · Integración de [PR #8](https://github.com/sdiaz23uclm/procesos2627/pull/8) · [commit de merge](https://github.com/sdiaz23uclm/procesos2627/commit/2b30b2d)
+- 2026-10-14 · Corrección de `.gitignore` · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/78b5ce8)
+- 2026-10-13 · Lógica de correo según el mensaje del commit · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/fb0b5ee)
+- 2026-10-13 · Corrección de comprobación de correo según el mensaje del commit · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/6267d36)
+- 2026-10-13 · Integración de [PR #7](https://github.com/sdiaz23uclm/procesos2627/pull/7) · [commit de merge](https://github.com/sdiaz23uclm/procesos2627/commit/5c1db04)
+- 2026-10-13 · Pruebas de lógica de usuarios y corrección de comprobación de estado en el inicio de sesión · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/0667d61)
+- 2026-10-13 · Integración de [PR #6](https://github.com/sdiaz23uclm/procesos2627/pull/6) · [commit de merge](https://github.com/sdiaz23uclm/procesos2627/commit/a39dad0)
+- 2026-10-13 · Configuración de integración continua según el mensaje del commit · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/fa4de93)
+- 2026-10-13 · Integración de [PR #5](https://github.com/sdiaz23uclm/procesos2627/pull/5) · [commit de merge](https://github.com/sdiaz23uclm/procesos2627/commit/53205c0)
+- 2026-10-13 · Intento de corrección según el mensaje del commit · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/b324995)
+- 2026-10-13 · Integración de [PR #4](https://github.com/sdiaz23uclm/procesos2627/pull/4) · [commit de merge](https://github.com/sdiaz23uclm/procesos2627/commit/7962b1b)
+- 2026-10-13 · Cambio de puerto de la API según el mensaje del commit · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/1e0ca0f)
+- 2026-10-13 · Integración de [PR #3](https://github.com/sdiaz23uclm/procesos2627/pull/3) · [commit de merge](https://github.com/sdiaz23uclm/procesos2627/commit/ea0ccdd)
+- 2026-10-13 · Cambio del README según el mensaje del commit · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/38ae6ab)
+- 2026-10-13 · Integración de [PR #2](https://github.com/sdiaz23uclm/procesos2627/pull/2) · [commit de merge](https://github.com/sdiaz23uclm/procesos2627/commit/e9155e2)
+- 2026-10-13 · Integración de [PR #1](https://github.com/sdiaz23uclm/procesos2627/pull/1) · [commit de merge](https://github.com/sdiaz23uclm/procesos2627/commit/0b4b198)
+- 2026-10-13 · Commit identificado como Hito 3: persistencia, roles y logs · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/aa2da12)
+- 2026-10-13 · Cambios de estilos y pruebas unitarias según el mensaje del commit · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/ca329ef)
+- 2026-10-13 · Actualización de pruebas del Hito 2 según el mensaje del commit · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/f99af2c)
+- 2026-10-13 · Commit identificado como Hito 2 · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/bdcc772)
+- 2026-10-13 · Commit identificado como Hito 1: capas de datos y lógica, API y pruebas según el mensaje del commit · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/a904438)
+- 2026-10-13 · Creación del esqueleto según el mensaje del commit · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/52b1129)
+- 2026-09-30 · README creado en el commit base de PR #1 · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/98cfa6f)
+- 2026-09-30 · Commit inicial de prueba Markdown, anterior a PR #1 · [commit](https://github.com/sdiaz23uclm/procesos2627/commit/3652c8f)
+
+GitHub confirma que PR #1–#11 están integrados. Los commits `3652c8f` y `98cfa6f` son anteriores al primer PR; `5551fa0` está en `main` sin PR asociado en la lista consultada y tiene `web-flow` como committer. No se puede deducir del historial si hubo otras ediciones directas en la interfaz de GitHub. `git tag` no mostró etiquetas.
