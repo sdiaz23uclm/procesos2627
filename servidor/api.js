@@ -8,6 +8,7 @@ import { BaseDatosMongoDB } from './datos.js';
 import { LogicaUsuarios, normalizarEmail } from './logica.js';
 import { ServicioCorreoBrevo } from './correo.js';
 import { ClienteOAuthGoogle } from './oauth.js';
+import { GestorSesiones, DURACION_SESION_MS } from './sesiones.js';
 
 // Cargar variables de entorno del archivo .env
 dotenv.config();
@@ -32,8 +33,8 @@ const clienteOAuth = new ClienteOAuthGoogle({
 const COOKIE_SECURE = (process.env.APP_URL || '').startsWith('https://') ? '; Secure' : '';
 const PORT = process.env.PORT || 8080;
 
-// Almacenamiento simple de sesiones en memoria
-const sesionesActivas = new Map(); // sessionId -> emailUsuario
+// Sesiones persistidas en MongoDB (D-13): sobreviven a reinicios y a varias instancias
+const sesiones = new GestorSesiones(dao);
 
 function parsearCookies(req) {
   const list = {};
@@ -46,10 +47,23 @@ function parsearCookies(req) {
 }
 
 // Crea una sesión para el usuario y devuelve la cabecera Set-Cookie
-function crearSesion(email) {
-  const sessionId = crypto.randomBytes(32).toString('hex');
-  sesionesActivas.set(sessionId, email);
-  return `sessionId=${sessionId}; Path=/; HttpOnly; SameSite=Lax${COOKIE_SECURE}`;
+async function crearSesion(email) {
+  const sessionId = await sesiones.crear(email);
+  const maxAge = Math.floor(DURACION_SESION_MS / 1000);
+  return `sessionId=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${COOKIE_SECURE}`;
+}
+
+// Código HTTP para cada error de negocio
+const ESTADO_HTTP = {
+  NO_AUTENTICADO: 401,
+  SIN_PERMISOS: 403,
+  USUARIO_NO_ENCONTRADO: 404,
+  CORREO_NO_ENVIADO: 502,
+};
+
+function responderError(res, err, estadoPorDefecto = 400) {
+  res.writeHead(ESTADO_HTTP[err.codigo] || estadoPorDefecto);
+  res.end(JSON.stringify({ mensaje: mensajeError(err), codigo: err.codigo }));
 }
 
 // Traduce errores internos a mensajes comprensibles para el usuario
@@ -65,13 +79,26 @@ async function verificarSesionValida(req) {
   const sessionId = cookies.sessionId;
   if (!sessionId) return null;
   
-  const email = sesionesActivas.get(sessionId);
+  const email = await sesiones.obtenerEmail(sessionId);
   if (!email) return null;
 
   return await dao.obtenerPorEmail(email);
 }
 
 const server = http.createServer(async (req, res) => {
+  try {
+    await atenderPeticion(req, res);
+  } catch (err) {
+    // Cualquier fallo inesperado (p. ej. la BD no responde) devuelve 500 en lugar de tumbar el servidor
+    console.error(`[ERROR] ${req.method} ${req.url}: ${err.message}`);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+    }
+    res.end(JSON.stringify({ mensaje: 'Error interno del servidor. Inténtalo de nuevo en unos minutos.' }));
+  }
+});
+
+async function atenderPeticion(req, res) {
   const urlObj = new URL(req.url, `http://${req.headers.host}`);
   const pathname = urlObj.pathname;
 
@@ -137,7 +164,7 @@ const server = http.createServer(async (req, res) => {
           const { email, password } = JSON.parse(body);
           const usuario = await logica.loginUsuario(email, password);
           
-          res.setHeader('Set-Cookie', crearSesion(usuario.email));
+          res.setHeader('Set-Cookie', await crearSesion(usuario.email));
           res.writeHead(200);
           res.end(JSON.stringify({ email: usuario.email, rol: usuario.rol }));
         } catch (err) {
@@ -177,7 +204,7 @@ const server = http.createServer(async (req, res) => {
           }
           const email = await clienteOAuth.obtenerEmail(params.get('code'));
           const usuario = await logica.loginOAuth(email);
-          cookies.push(crearSesion(usuario.email));
+          cookies.push(await crearSesion(usuario.email));
           destino = '/';
         }
       } catch (err) {
@@ -235,23 +262,33 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // LISTAR USUARIOS (Solo Admin - Requisito apartado 4.2)
+    // LISTAR USUARIOS (solo admin, RF-07). La lógica devuelve solo datos públicos.
     if (pathname === '/api/usuarios' && req.method === 'GET') {
       try {
         const usuarioActual = await verificarSesionValida(req);
         const lista = await logica.listarUsuarios(usuarioActual);
-        // Ocultar passwordHash por seguridad al devolver el listado
-        const listaPublica = lista.map(u => ({ email: u.email, rol: u.rol, estado: u.estado }));
         res.writeHead(200);
-        res.end(JSON.stringify(listaPublica));
+        res.end(JSON.stringify(lista));
       } catch (err) {
-        res.writeHead(403);
-        res.end(JSON.stringify({ mensaje: err.message }));
+        responderError(res, err, 403);
       }
       return;
     }
 
-    // ELIMINAR USUARIO (Admin borra a cualquiera, usuario normal a sí mismo)
+    // COMPROBAR SI UN USUARIO ESTÁ ACTIVO (solo admin, RF-08)
+    if (pathname === '/api/usuarios/activo' && req.method === 'GET') {
+      try {
+        const usuarioActual = await verificarSesionValida(req);
+        const resultado = await logica.consultarActivo(usuarioActual, urlObj.searchParams.get('email'));
+        res.writeHead(200);
+        res.end(JSON.stringify(resultado));
+      } catch (err) {
+        responderError(res, err);
+      }
+      return;
+    }
+
+    // ELIMINAR USUARIO (admin a cualquiera, usuario normal a sí mismo, RF-09; borrado lógico D-12)
     if (pathname === '/api/eliminar' && req.method === 'DELETE') {
       let body = '';
       req.on('data', chunk => { body += chunk; });
@@ -260,16 +297,20 @@ const server = http.createServer(async (req, res) => {
           const usuarioActual = await verificarSesionValida(req);
           if (!usuarioActual) {
             res.writeHead(401);
-            res.end(JSON.stringify({ mensaje: 'No autorizado' }));
+            res.end(JSON.stringify({ mensaje: 'Tu sesión ha caducado. Inicia sesión de nuevo.' }));
             return;
           }
           const { emailTarget } = JSON.parse(body);
           await logica.eliminarUsuario(usuarioActual.email, emailTarget);
+          const emailEliminado = normalizarEmail(emailTarget);
+          await sesiones.cerrarTodasDe(emailEliminado);
+          if (emailEliminado === usuarioActual.email) {
+            res.setHeader('Set-Cookie', `sessionId=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${COOKIE_SECURE}`);
+          }
           res.writeHead(200);
           res.end(JSON.stringify({ mensaje: 'Usuario eliminado correctamente' }));
         } catch (err) {
-          res.writeHead(403);
-          res.end(JSON.stringify({ mensaje: err.message }));
+          responderError(res, err);
         }
       });
       return;
@@ -278,10 +319,8 @@ const server = http.createServer(async (req, res) => {
     // LOGOUT
     if (pathname === '/api/logout' && req.method === 'POST') {
       const cookies = parsearCookies(req);
-      if (cookies.sessionId) {
-        sesionesActivas.delete(cookies.sessionId);
-      }
-      res.setHeader('Set-Cookie', `sessionId=; Path=/; HttpOnly; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT${COOKIE_SECURE}`);
+      await sesiones.cerrar(cookies.sessionId);
+      res.setHeader('Set-Cookie', `sessionId=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${COOKIE_SECURE}`);
       res.writeHead(200);
       res.end(JSON.stringify({ mensaje: 'Sesión cerrada' }));
       return;
@@ -293,12 +332,22 @@ const server = http.createServer(async (req, res) => {
   }
 
   // --- ARCHIVOS ESTÁTICOS DEL CLIENTE ---
-  let filePath = path.join(__dirname, '../cliente', pathname === '/' ? 'index.html' : pathname);
+  const dirCliente = path.join(__dirname, '../cliente');
+  const filePath = path.join(dirCliente, pathname === '/' ? 'index.html' : pathname);
+  if (!filePath.startsWith(dirCliente + path.sep)) {
+    res.writeHead(403, { 'Content-Type': 'text/html' });
+    res.end('<h1>403 Prohibido</h1>');
+    return;
+  }
   const extname = String(path.extname(filePath)).toLowerCase();
   const mimeTypes = {
     '.html': 'text/html',
     '.js': 'text/javascript',
-    '.css': 'text/css'
+    '.css': 'text/css',
+    '.json': 'application/json',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.ico': 'image/x-icon'
   };
 
   const contentType = mimeTypes[extname] || 'application/octet-stream';
@@ -317,7 +366,7 @@ const server = http.createServer(async (req, res) => {
       res.end(content, 'utf-8');
     }
   });
-});
+}
 
 server.listen(PORT,'0.0.0.0', () => {
   console.log(`Servidor escuchando en el puerto ${PORT}`);

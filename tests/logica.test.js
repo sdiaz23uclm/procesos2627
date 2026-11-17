@@ -7,27 +7,31 @@ class DAOMock {
   constructor() {
     this.usuarios = [];
   }
+  // Igual que la BD real: las cuentas eliminadas (borrado lógico) no se encuentran por email ni token
+  vigente(u) {
+    return u.estado !== 'eliminado';
+  }
   async guardar(usuario) {
     this.usuarios.push(usuario);
     return usuario;
   }
   async obtenerPorEmail(email) {
-    return this.usuarios.find(u => u.email === email) || null;
+    return this.usuarios.find(u => u.email === email && this.vigente(u)) || null;
+  }
+  async obtenerPorTokenConfirmacion(tokenHash) {
+    return this.usuarios.find(u => u.tokenConfirmacionHash === tokenHash && this.vigente(u)) || null;
   }
   async obtenerTodos() {
     return this.usuarios;
   }
-  async obtenerPorTokenConfirmacion(tokenHash) {
-    return this.usuarios.find(u => u.tokenConfirmacionHash === tokenHash) || null;
-  }
   async actualizar(email, cambios) {
-    const u = this.usuarios.find(x => x.email === email);
+    const u = this.usuarios.find(x => x.email === email && this.vigente(x));
     if (!u) return false;
     Object.assign(u, cambios);
     return true;
   }
   async eliminar(email) {
-    const index = this.usuarios.findIndex(u => u.email === email);
+    const index = this.usuarios.findIndex(u => u.email === email && this.vigente(u));
     if (index !== -1) {
       this.usuarios.splice(index, 1);
       return true;
@@ -272,4 +276,87 @@ test('20. Error al hacer login local en una cuenta creada con Google', async () 
 
 test('21. Error si OAuth entrega un email no válido', async () => {
   await assert.rejects(() => logica.loginOAuth(undefined), /EMAIL_INVALIDO/);
+});
+
+// --- RF-08 / RF-09: consulta de actividad y borrado lógico (D-12) ---
+
+// Crea un usuario ya confirmado y lo devuelve
+async function crearConfirmado(email, password = 'Password123*', rol = 'usuario') {
+  await logica.registrarUsuario(email, password, rol);
+  await logica.confirmarCuenta(correo.ultimoToken());
+  return await daoMock.obtenerPorEmail(email);
+}
+
+test('22. El listado del administrador no expone hashes e indica si cada usuario está activo', async () => {
+  const admin = await crearConfirmado('admin@test.com', 'x', 'admin');
+  await logica.registrarUsuario('pend@test.com', '123456');
+  const lista = await logica.listarUsuarios(admin);
+  assert.deepStrictEqual(lista, [
+    { email: 'admin@test.com', rol: 'admin', estado: 'confirmado', activo: true },
+    { email: 'pend@test.com', rol: 'usuario', estado: 'pendiente', activo: false },
+  ]);
+});
+
+test('23. El administrador consulta si un usuario está activo', async () => {
+  const admin = await crearConfirmado('admin@test.com', 'x', 'admin');
+  await crearConfirmado('ana@test.com');
+  assert.deepStrictEqual(await logica.consultarActivo(admin, ' ANA@test.com '), { email: 'ana@test.com', activo: true });
+  assert.deepStrictEqual(await logica.consultarActivo(admin, 'nadie@test.com'), { email: 'nadie@test.com', activo: false });
+});
+
+test('24. Error: un usuario normal no puede consultar si otro está activo', async () => {
+  const normal = await crearConfirmado('normal@test.com');
+  await assert.rejects(() => logica.consultarActivo(normal, 'normal@test.com'), { codigo: 'SIN_PERMISOS' });
+  await assert.rejects(() => logica.consultarActivo(null, 'normal@test.com'), { codigo: 'SIN_PERMISOS' });
+});
+
+test('25. Un usuario se elimina a sí mismo: queda marcado y no puede volver a iniciar sesión', async () => {
+  await crearConfirmado('yo@test.com', 'Password123*');
+  await logica.eliminarUsuario('yo@test.com', 'yo@test.com');
+
+  const registro = daoMock.usuarios.find(u => u.email === 'yo@test.com');
+  assert.strictEqual(registro.estado, 'eliminado');
+  assert.ok(registro.eliminadoEn instanceof Date);
+  assert.strictEqual(await logica.comprobarActivo('yo@test.com'), false);
+  await assert.rejects(() => logica.loginUsuario('yo@test.com', 'Password123*'), /Credenciales inválidas/);
+});
+
+test('26. Error: un usuario normal no puede eliminar a otro', async () => {
+  await crearConfirmado('a@test.com');
+  await crearConfirmado('b@test.com');
+  await assert.rejects(() => logica.eliminarUsuario('a@test.com', 'b@test.com'), { codigo: 'SIN_PERMISOS' });
+  assert.strictEqual((await daoMock.obtenerPorEmail('b@test.com')).estado, 'confirmado');
+});
+
+test('27. El administrador puede eliminar a cualquier usuario', async () => {
+  await crearConfirmado('admin@test.com', 'x', 'admin');
+  await crearConfirmado('victima@test.com');
+  await logica.eliminarUsuario('admin@test.com', 'victima@test.com');
+  assert.strictEqual(await daoMock.obtenerPorEmail('victima@test.com'), null);
+});
+
+test('28. Error al eliminar un usuario inexistente o ya eliminado', async () => {
+  await crearConfirmado('admin@test.com', 'x', 'admin');
+  await assert.rejects(() => logica.eliminarUsuario('admin@test.com', 'fantasma@test.com'), { codigo: 'USUARIO_NO_ENCONTRADO' });
+});
+
+test('29. Tras eliminarse, el mismo email puede registrarse de nuevo y obtiene una cuenta nueva', async () => {
+  await crearConfirmado('vuelve@test.com', 'Vieja123*');
+  await logica.eliminarUsuario('vuelve@test.com', 'vuelve@test.com');
+
+  const nueva = await logica.registrarUsuario('vuelve@test.com', 'Nueva123*');
+  assert.strictEqual(nueva.estado, 'pendiente');
+  assert.strictEqual(daoMock.usuarios.filter(u => u.email === 'vuelve@test.com').length, 2);
+  await logica.confirmarCuenta(correo.ultimoToken());
+  // La contraseña vieja ya no vale: es otra cuenta
+  await assert.rejects(() => logica.loginUsuario('vuelve@test.com', 'Vieja123*'), /Credenciales inválidas/);
+  await logica.loginUsuario('vuelve@test.com', 'Nueva123*');
+});
+
+test('30. Una cuenta eliminada no se reactiva con Google: se crea una cuenta nueva', async () => {
+  await crearConfirmado('g@test.com');
+  await logica.eliminarUsuario('g@test.com', 'g@test.com');
+  const u = await logica.loginOAuth('g@test.com');
+  assert.strictEqual(u.estado, 'oauth');
+  assert.strictEqual(daoMock.usuarios.filter(x => x.email === 'g@test.com').length, 2);
 });

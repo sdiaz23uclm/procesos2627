@@ -1,75 +1,106 @@
-# procesos2627
-Proyecto de Procesos de Ingeniería del Software curso 26-27
+# procesos2627 — CloudSaaS Platform
 
-# Sprint 1: Desarrollar la arquitectura base del proyecto
-Bienvenidos al Proyecto de Procesos 26-27!
+Proyecto individual de Procesos de Ingeniería del Software (curso 2026-2027). Aplicación tipo SaaS con arquitectura en capas y gestión de usuarios: registro con confirmación por correo, inicio de sesión local y con Google, roles de usuario y administrador, y persistencia en MongoDB. Será la base del juego «Alianzas» (Sprint 2).
 
-# CloudSaaS Platform
+**URL pública:** https://procesos26-27-1061448815388.europe-southwest1.run.app
 
-Aplicación tipo SaaS (Software as a Service) desarrollada con arquitectura en capas, gestión de usuarios, roles (usuario y administrador), persistencia real en base de datos y diseño moderno[cite: 1, 2, 5, 8].
+> La capa gratuita de Cloud Run apaga el servicio tras un rato sin uso: la primera petición puede tardar unos segundos.
 
-## Tecnologías Elegidas (y Justificación)
-* **Node.js (con módulos nativos y arquitectura en capas)**: Elegido por su ligereza y eficiencia en la gestión de APIs HTTP asíncronas, permitiendo una separación limpia entre la capa API, la lógica de negocio y el acceso a datos[cite: 1, 2].
-* **MongoDB Atlas**: Base de datos NoSQL en la nube elegida por su alta disponibilidad, gratuidad en capa inicial y facilidad de integración asíncrona mediante el driver oficial de Node.js.
-* **Brevo**: servicio de correo transaccional con capa gratuita (300 correos/día) para enviar el enlace de confirmación de cuenta; se usa por API HTTP porque Cloud Run no permite SMTP directo.
-* **Bcryptjs**: Seleccionado para garantizar la seguridad mediante el hashing seguro de contraseñas de usuario, evitando su almacenamiento en texto plano[cite: 2, 5].
-* **HTML5 & CSS3 nativo (Vanilla)**: Utilizado para la interfaz visual y el cliente de red (`rest.js`), asegurando un diseño rápido, modular y sin sobrecarga de frameworks pesados[cite: 1, 2].
+## Tecnologías elegidas
 
-## Requisitos Previos
-* Tener instalado [Node.js](https://nodejs.org/) (versión 18 o superior recomendada).
-* Una cuenta activa en MongoDB Atlas con un clúster configurado[cite: 5].
+| Tecnología | Por qué |
+|---|---|
+| **Node.js** (servidor `http` nativo, módulos ES) | Ligero y asíncrono; sin framework se ve claramente dónde está cada capa. |
+| **HTML + CSS + JavaScript nativos** | Interfaz sencilla y sin dependencias; `rest.js` separa la comunicación de la presentación. |
+| **MongoDB Atlas** (driver oficial) | Base de datos real con capa gratuita en la nube; guarda usuarios y sesiones. |
+| **bcryptjs** | Hash seguro de contraseñas, nunca en texto plano. |
+| **Brevo** (API HTTP) | Correo transaccional gratuito (300/día) para la confirmación de cuenta; Cloud Run no permite SMTP directo. |
+| **Google OAuth 2.0** | Inicio de sesión externo; las credenciales se crean en el mismo Google Cloud donde está desplegada la app. |
+| **node:test** | Framework de pruebas incluido en Node.js: no añade dependencias. |
+| **GitHub Actions** | Integración continua: ejecuta las pruebas en cada PR y en cada cambio en `main`. |
+| **Google Cloud Run** | Despliegue continuo desde GitHub con capa gratuita y URL pública. |
 
-## Configuración del Entorno
-Crea un archivo `.env` en la raíz del proyecto basándote en el archivo de ejemplo `.env.example`:
+Las decisiones de diseño y sus motivos están en [`docs/decisiones.md`](docs/decisiones.md); las capas y los endpoints, en [`docs/arquitectura.md`](docs/arquitectura.md).
 
-```env
-PORT=3000
-MONGODB_URI=tu_cadena_de_conexion_de_mongodb_atlas
-ADMIN_EMAIL=tu_correo_de_administrador@saas.com
-APP_URL=http://localhost:3000
-BREVO_API_KEY=tu_clave_de_api_de_brevo
-MAIL_FROM=remitente_verificado_en_brevo@ejemplo.com
-GOOGLE_CLIENT_ID=tu_client_id_de_google
-GOOGLE_CLIENT_SECRET=tu_client_secret_de_google
+## Estructura
+
+```
+servidor/
+  api.js        capa API: servidor HTTP, rutas, cookies (y composición de dependencias)
+  sesiones.js   capa API: gestión de sesiones
+  logica.js     capa de lógica de negocio (no conoce HTTP ni servicios externos)
+  datos.js      capa de acceso a datos (MongoDB)
+  correo.js     servicio externo de correo (Brevo)
+  oauth.js      servicio externo de OAuth (Google)
+cliente/
+  index.html    capa de presentación
+  rest.js       capa de comunicación con el servidor
+tests/          pruebas automatizadas (node:test)
+docs/           documentación del proyecto (bundle OKF)
 ```
 
-* `APP_URL`: URL base usada para construir el enlace de confirmación (en producción, la URL pública de Cloud Run, sin barra final).
-* `BREVO_API_KEY` y `MAIL_FROM`: clave de API de Brevo y remitente verificado en Brevo.
-* `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`: credenciales del cliente OAuth (tipo «Aplicación web») creado en Google Cloud.
-* En Cloud Run, `MONGODB_URI`, `BREVO_API_KEY` y `GOOGLE_CLIENT_SECRET` se guardan en Secret Manager y se referencian como variables de entorno.
+## Ejecutar en local
 
-## Confirmación de cuenta por correo
-Al registrarse, la cuenta queda `pendiente` y se envía un correo con un enlace (`/api/confirmar?token=…`) válido 24 horas. Al abrirlo, la cuenta pasa a `confirmado` y ya se puede iniciar sesión. Si el enlace caduca, al intentar iniciar sesión aparece el botón «Reenviar correo de confirmación».
+Requisitos: Node.js 18 o superior y un clúster de MongoDB Atlas.
 
-Los correos a dominios de la universidad pueden quedar retenidos por su filtro; para probar, usa otro buzón.
-
-## Inicio de sesión con Google
-El botón «Entrar con Google» usa OAuth 2.0 (flujo de código de autorización). En Google Cloud, el cliente OAuth debe tener registradas exactamente estas URI de redireccionamiento: `http://localhost:3000/api/auth/google/callback` (desarrollo) y `<APP_URL>/api/auth/google/callback` (producción). Si ya existía una cuenta local pendiente con el mismo email, se vincula y queda confirmada.
-
-## Instalación y Ejecución
-
-1. Clona el repositorio e instálate las dependencias situándote en la raíz del proyecto:
+1. Instala las dependencias:
    ```bash
    npm install
+   ```
+2. Crea un archivo `.env` en la raíz a partir de [`.env.example`](.env.example) (ver la tabla de variables).
+3. Arranca el servidor:
+   ```bash
+   npm start
+   ```
+4. Abre http://localhost:3000
 
-    Configura tu archivo .env con los valores correspondientes (como se indica en la sección anterior).
+## Pruebas
 
-    Ejecución: Arranca el servidor ejecutando el siguiente comando en la raíz:
-
-    npm start
-
-    (Esto pondrá en marcha la aplicación, normalmente accesible en http://localhost:3000).
-
-Pruebas (Tests)
-
-Para ejecutar la suite de pruebas del proyecto, utiliza el comando:
-
+```bash
 npm test
+```
 
-## Variante 2: normalización y validación de email
+Ejecuta todas las pruebas de `tests/` con `node --test`. No necesitan base de datos ni conexión a internet: MongoDB, Brevo y Google se sustituyen por dobles de prueba.
 
-El endpoint público `POST /api/prueba/email` recibe un JSON con el campo `email`.
-Elimina los espacios exteriores, convierte el email a minúsculas y valida su formato.
+## Variables de entorno
+
+Solo nombres; los valores nunca se suben al repositorio.
+
+| Variable | Para qué | Secreta |
+|---|---|---|
+| `PORT` | Puerto local (en Cloud Run lo pone la plataforma: no se define). | No |
+| `MONGODB_URI` | Cadena de conexión a MongoDB Atlas. | **Sí** |
+| `ADMIN_EMAIL` | Email que obtiene el rol de administrador. | No |
+| `APP_URL` | URL base de la app, sin barra final (`http://localhost:3000` en local). Se usa para el enlace del correo y el retorno de Google. | No |
+| `BREVO_API_KEY` | Clave de API de Brevo (empieza por `xkeysib-`, no es la clave SMTP). | **Sí** |
+| `MAIL_FROM` | Remitente verificado en Brevo. | No |
+| `GOOGLE_CLIENT_ID` | ID del cliente OAuth de Google. | No |
+| `GOOGLE_CLIENT_SECRET` | Secreto del cliente OAuth de Google. | **Sí** |
+
+En Cloud Run, las variables secretas se guardan en **Secret Manager** y se referencian como variables de entorno; la cuenta de servicio de Cloud Run necesita el rol «Descriptor de acceso a secretos de Secret Manager».
+
+## Acceso como administrador
+
+La cuenta que se registre (o entre con Google) con el email configurado en `ADMIN_EMAIL` obtiene el rol `admin`. Si se registra con contraseña, debe confirmar el correo antes de entrar. El administrador puede listar usuarios, comprobar si un usuario está activo y eliminar cualquier cuenta.
+
+Las credenciales de prueba del administrador se envían junto con la entrega, no se publican aquí.
+
+## Funcionalidades
+
+- **Registro y confirmación por correo.** La cuenta queda `pendiente` y se envía un enlace (`/api/confirmar?token=…`) válido 24 horas. Si caduca, al intentar entrar aparece «Reenviar correo de confirmación». Los correos a dominios de la universidad pueden quedar retenidos por su filtro: para probar, usa otro buzón.
+- **Inicio de sesión con Google.** En Google Cloud, el cliente OAuth debe tener registradas exactamente `http://localhost:3000/api/auth/google/callback` y `<APP_URL>/api/auth/google/callback`. Mientras la pantalla de consentimiento esté en modo «Prueba», solo pueden entrar los usuarios de prueba añadidos. Si ya existía una cuenta local pendiente con ese email, se vincula y queda confirmada.
+- **Sesión.** Cookie `HttpOnly` con sesión guardada en MongoDB durante 7 días: se mantiene al recargar y tras reiniciar el servidor.
+- **Usuario activo.** Ha confirmado su correo o entró con Google, y no ha sido eliminado.
+- **Eliminar cuenta.** Borrado lógico: la cuenta queda `eliminado`, no puede volver a iniciar sesión y se cierran sus sesiones. El mismo email puede registrarse de nuevo como cuenta nueva.
+- **Errores.** Cada error se muestra junto al formulario que lo provocó; los errores inesperados del servidor devuelven un mensaje genérico en lugar de tumbar la aplicación. La actividad relevante se registra en el log con el prefijo `[LOG]`.
+
+## Flujo de trabajo y CI/CD
+
+GitHub Flow: cada cambio en su rama, `npm test` en local, pull request contra `main` y merge con el CI en verde. GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) ejecuta las pruebas en cada PR y push a `main`; Cloud Run despliega automáticamente cada cambio que llega a `main`. Detalle en [`docs/procesos.md`](docs/procesos.md).
+
+## Endpoint de la variante 2: normalización y validación de email
+
+`POST /api/prueba/email` recibe un JSON con el campo `email`, elimina los espacios exteriores, lo pasa a minúsculas y valida su formato.
 
 ```json
 {"email": " Ana@X.com "}

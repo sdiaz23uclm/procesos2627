@@ -2,7 +2,7 @@
 type: Sprint
 title: Sprint 1
 description: Hitos de referencia y evidencia del estado alcanzado en el repositorio.
-timestamp: 2026-10-28
+timestamp: 2026-11-17
 ---
 
 El calendario y los objetivos de los hitos se toman del apartado 10 de la especificación. Son orientativos. El estado descrito es el comprobable en el código actual y en los mensajes de Git.
@@ -34,10 +34,10 @@ El calendario y los objetivos de los hitos se toman del apartado 10 de la especi
 ## Hito 4 — Servicios externos y cierre
 
 - **Objetivo:** OAuth, confirmación por correo, manejo de errores con feedback, README completo y revisión final.
-- **Qué se hizo:** los commits `fb0b5ee` y `6267d36` mencionan lógica y comprobación de correo; el código actual aún deja el registro en estado pendiente y no implementa envío ni confirmación. No se encontraron rutas OAuth. La interfaz muestra errores de registro e inicio de sesión; el [README](../README.md) documenta tecnologías, ejecución y pruebas.
-- **PR:** GitHub confirma integrados los PR [#4](https://github.com/sdiaz23uclm/procesos2627/pull/4)–[#11](https://github.com/sdiaz23uclm/procesos2627/pull/11). Sus títulos incluyen correcciones de API, CI, pruebas, README, normalización y `.gitignore`; no hay evidencia suficiente para atribuir un PR concreto a OAuth o a la entrega completa del Hito 4.
-- **Etiqueta:** no hay etiquetas según `git tag`.
-- **Desviaciones del flujo:** el commit `5551fa0` fuera de PR se describe en el Hito 1; no se puede determinar si hubo otras ediciones directas en GitHub.
+- **Qué se hizo:** confirmación de cuenta por correo con Brevo (RF-02, D-09); inicio de sesión con Google (RF-04, D-10, D-11); consulta de actividad para el administrador (RF-08); borrado lógico (RF-09, D-12); sesiones persistidas en MongoDB (D-13); manejo de errores con códigos y respuesta `500` controlada (RNF-07); README reescrito. Las pruebas pasan de 9 a 47.
+- **PR:** uno por rama: `feature/RF-02-confirmacion-correo`, `feature/RF-04-oauth-google`, `feature/cierre-hito-4`. Por verificar: números de PR.
+- **Etiqueta:** `hito-4` (por crear al integrar la última rama).
+- **Incidencias:** Brevo respondía `401` hasta corregir la clave de API; los correos al dominio de la universidad quedaban bloqueados por su filtro; Cloud Run no podía leer los secretos hasta dar el rol de acceso a Secret Manager a su cuenta de servicio.
 
 ## Tablero
 

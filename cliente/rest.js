@@ -51,6 +51,42 @@ const RestClient = {
     return await respuesta.json();
   },
 
+  // --- Administración (el servidor comprueba el rol; aquí solo se hace la petición) ---
+
+  async listarUsuarios() {
+    return await this._pedir('/api/usuarios', {}, 'No se pudo obtener el listado de usuarios');
+  },
+
+  async consultarActivo(email) {
+    return await this._pedir(`/api/usuarios/activo?email=${encodeURIComponent(email)}`, {}, 'No se pudo consultar el usuario');
+  },
+
+  async eliminarUsuario(emailTarget) {
+    return await this._pedir('/api/eliminar', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emailTarget })
+    }, 'No se pudo eliminar el usuario');
+  },
+
+  // Petición genérica: devuelve el JSON o lanza un Error con el mensaje del servidor
+  async _pedir(url, opciones, mensajePorDefecto) {
+    let respuesta;
+    try {
+      respuesta = await fetch(url, opciones);
+    } catch {
+      throw new Error('No hay conexión con el servidor. Comprueba tu conexión a internet.');
+    }
+    const datos = await respuesta.json().catch(() => ({}));
+    if (!respuesta.ok) {
+      const err = new Error(datos.mensaje || mensajePorDefecto);
+      err.codigo = datos.codigo;
+      err.estado = respuesta.status;
+      throw err;
+    }
+    return datos;
+  },
+
   async logout() {
     const respuesta = await fetch('/api/logout', { method: 'POST' });
     return respuesta.ok;

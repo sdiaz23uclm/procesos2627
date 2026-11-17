@@ -2,6 +2,7 @@
 
 Del evento más reciente al más antiguo. Las referencias enlazan a commits y PR de este repositorio. Se consultó la lista de PR y el detalle de cada uno: los PR #1–#11 están integrados.
 
+- 2026-11-17 · Rama `feature/cierre-hito-4`: borrado lógico (D-12), sesiones en MongoDB (D-13), consulta de actividad para el administrador, manejo de errores y README · PR por abrir
 - 2026-11-17 · Rama `feature/RF-04-oauth-google`: inicio de sesión con Google (OAuth 2.0) · PR por abrir
 - 2026-11-17 · Rama `feature/RF-02-confirmacion-correo`: decisiones D-09 a D-11 y confirmación de cuenta por correo con Brevo · PR por abrir
 - 2026-10-28 · Integración de [PR #11](https://github.com/sdiaz23uclm/procesos2627/pull/11); cambio de `.gitignore` para excluir `node_modules` · [commit de merge](https://github.com/sdiaz23uclm/procesos2627/commit/8627ff9)
