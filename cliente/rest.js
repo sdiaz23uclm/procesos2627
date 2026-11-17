@@ -5,11 +5,11 @@ const RestClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
+    const datos = await respuesta.json();
     if (!respuesta.ok) {
-      const error = await respuesta.json();
-      throw new Error(error.mensaje || 'Error en el registro');
+      throw new Error(datos.mensaje || 'Error en el registro');
     }
-    return await respuesta.json();
+    return datos;
   },
 
   async login(email, password) {
@@ -20,9 +20,24 @@ const RestClient = {
     });
     if (!respuesta.ok) {
       const error = await respuesta.json();
-      throw new Error(error.mensaje || 'Error en el inicio de sesión');
+      const err = new Error(error.mensaje || 'Error en el inicio de sesión');
+      err.codigo = error.codigo;
+      throw err;
     }
     return await respuesta.json();
+  },
+
+  async reenviarConfirmacion(email) {
+    const respuesta = await fetch('/api/reenviar-confirmacion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const datos = await respuesta.json();
+    if (!respuesta.ok) {
+      throw new Error(datos.mensaje || 'No se pudo reenviar el correo');
+    }
+    return datos;
   },
 
   async comprobarSesion() {

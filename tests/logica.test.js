@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { test, beforeEach } from 'node:test';
-import { LogicaUsuarios, normalizarEmail } from '../servidor/logica.js';
+import { LogicaUsuarios, normalizarEmail, VALIDEZ_TOKEN_MS } from '../servidor/logica.js';
 
 // Creamos un DAO simulado en memoria para las pruebas unitarias (evita depender de MongoDB externo en los tests)
 class DAOMock {
@@ -17,6 +17,15 @@ class DAOMock {
   async obtenerTodos() {
     return this.usuarios;
   }
+  async obtenerPorTokenConfirmacion(tokenHash) {
+    return this.usuarios.find(u => u.tokenConfirmacionHash === tokenHash) || null;
+  }
+  async actualizar(email, cambios) {
+    const u = this.usuarios.find(x => x.email === email);
+    if (!u) return false;
+    Object.assign(u, cambios);
+    return true;
+  }
   async eliminar(email) {
     const index = this.usuarios.findIndex(u => u.email === email);
     if (index !== -1) {
@@ -27,12 +36,31 @@ class DAOMock {
   }
 }
 
+// Doble del servicio de correo: guarda los envíos en lugar de llamar a Brevo
+class CorreoFalso {
+  constructor() {
+    this.enviados = [];
+    this.fallar = false;
+  }
+  async enviarConfirmacion(email, token) {
+    if (this.fallar) throw new Error('fallo simulado del proveedor');
+    this.enviados.push({ email, token });
+  }
+  ultimoToken() {
+    return this.enviados.at(-1).token;
+  }
+}
+
 let logica;
 let daoMock;
+let correo;
+let ahora;
 
 beforeEach(() => {
   daoMock = new DAOMock();
-  logica = new LogicaUsuarios(daoMock);
+  correo = new CorreoFalso();
+  ahora = Date.parse('2026-11-17T12:00:00Z');
+  logica = new LogicaUsuarios(daoMock, correo, { reloj: () => ahora });
 });
 
 test('variante2: normaliza espacios exteriores y mayúsculas del email', () => {
@@ -115,4 +143,80 @@ test('6. Error al intentar iniciar sesión con una cuenta pendiente de confirmar
   await assert.rejects(async () => {
     await logica.loginUsuario(email, password);
   }, /La cuenta está pendiente de confirmación/);
+});
+
+// --- RF-02: confirmación de cuenta por correo ---
+
+test('7. El registro envía un correo de confirmación con un token al email del usuario', async () => {
+  const u = await logica.registrarUsuario('nuevo@test.com', '123456');
+  assert.strictEqual(correo.enviados.length, 1);
+  assert.strictEqual(correo.enviados[0].email, 'nuevo@test.com');
+  assert.ok(correo.ultimoToken().length >= 32);
+  // En BD solo se guarda el hash del token, nunca el token en claro
+  assert.notStrictEqual(u.tokenConfirmacionHash, correo.ultimoToken());
+});
+
+test('8. Un token válido confirma la cuenta y después se puede iniciar sesión', async () => {
+  await logica.registrarUsuario('conf@test.com', 'Password123*');
+  await logica.confirmarCuenta(correo.ultimoToken());
+
+  const u = await daoMock.obtenerPorEmail('conf@test.com');
+  assert.strictEqual(u.estado, 'confirmado');
+  assert.strictEqual(await logica.comprobarActivo('conf@test.com'), true);
+  const login = await logica.loginUsuario('conf@test.com', 'Password123*');
+  assert.strictEqual(login.email, 'conf@test.com');
+});
+
+test('9. Error al confirmar con un token inexistente o vacío', async () => {
+  await logica.registrarUsuario('x@test.com', '123456');
+  await assert.rejects(() => logica.confirmarCuenta('token-inventado'), { codigo: 'TOKEN_INVALIDO' });
+  await assert.rejects(() => logica.confirmarCuenta(''), { codigo: 'TOKEN_INVALIDO' });
+  await assert.rejects(() => logica.confirmarCuenta(undefined), { codigo: 'TOKEN_INVALIDO' });
+  assert.strictEqual((await daoMock.obtenerPorEmail('x@test.com')).estado, 'pendiente');
+});
+
+test('10. Error al confirmar con un token caducado', async () => {
+  await logica.registrarUsuario('tarde@test.com', '123456');
+  ahora += VALIDEZ_TOKEN_MS + 1;
+  await assert.rejects(() => logica.confirmarCuenta(correo.ultimoToken()), { codigo: 'TOKEN_CADUCADO' });
+  assert.strictEqual((await daoMock.obtenerPorEmail('tarde@test.com')).estado, 'pendiente');
+});
+
+test('11. Un token ya usado no se puede reutilizar', async () => {
+  await logica.registrarUsuario('una@test.com', '123456');
+  const token = correo.ultimoToken();
+  await logica.confirmarCuenta(token);
+  await assert.rejects(() => logica.confirmarCuenta(token), { codigo: 'TOKEN_INVALIDO' });
+});
+
+test('12. Si falla el envío del correo, el registro se deshace y se informa del error', async () => {
+  correo.fallar = true;
+  await assert.rejects(() => logica.registrarUsuario('sin@test.com', '123456'), { codigo: 'CORREO_NO_ENVIADO' });
+  assert.strictEqual(await daoMock.obtenerPorEmail('sin@test.com'), null);
+});
+
+test('13. Reenviar confirmación genera un token nuevo e invalida el anterior', async () => {
+  await logica.registrarUsuario('re@test.com', '123456');
+  const tokenViejo = correo.ultimoToken();
+  await logica.reenviarConfirmacion('re@test.com');
+  const tokenNuevo = correo.ultimoToken();
+
+  assert.strictEqual(correo.enviados.length, 2);
+  assert.notStrictEqual(tokenNuevo, tokenViejo);
+  await assert.rejects(() => logica.confirmarCuenta(tokenViejo), { codigo: 'TOKEN_INVALIDO' });
+  await logica.confirmarCuenta(tokenNuevo);
+  assert.strictEqual((await daoMock.obtenerPorEmail('re@test.com')).estado, 'confirmado');
+});
+
+test('14. Reenviar no envía nada si la cuenta no existe o ya está confirmada', async () => {
+  await logica.reenviarConfirmacion('noexiste@test.com');
+  await logica.registrarUsuario('ok@test.com', '123456');
+  await logica.confirmarCuenta(correo.ultimoToken());
+  await logica.reenviarConfirmacion('ok@test.com');
+  assert.strictEqual(correo.enviados.length, 1);
+});
+
+test('15. El login de una cuenta pendiente devuelve el código CUENTA_PENDIENTE', async () => {
+  await logica.registrarUsuario('pend@test.com', '123456');
+  await assert.rejects(() => logica.loginUsuario('pend@test.com', '123456'), { codigo: 'CUENTA_PENDIENTE' });
 });

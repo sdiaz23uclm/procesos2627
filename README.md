@@ -11,6 +11,7 @@ Aplicación tipo SaaS (Software as a Service) desarrollada con arquitectura en c
 ## Tecnologías Elegidas (y Justificación)
 * **Node.js (con módulos nativos y arquitectura en capas)**: Elegido por su ligereza y eficiencia en la gestión de APIs HTTP asíncronas, permitiendo una separación limpia entre la capa API, la lógica de negocio y el acceso a datos[cite: 1, 2].
 * **MongoDB Atlas**: Base de datos NoSQL en la nube elegida por su alta disponibilidad, gratuidad en capa inicial y facilidad de integración asíncrona mediante el driver oficial de Node.js.
+* **Brevo**: servicio de correo transaccional con capa gratuita (300 correos/día) para enviar el enlace de confirmación de cuenta; se usa por API HTTP porque Cloud Run no permite SMTP directo.
 * **Bcryptjs**: Seleccionado para garantizar la seguridad mediante el hashing seguro de contraseñas de usuario, evitando su almacenamiento en texto plano[cite: 2, 5].
 * **HTML5 & CSS3 nativo (Vanilla)**: Utilizado para la interfaz visual y el cliente de red (`rest.js`), asegurando un diseño rápido, modular y sin sobrecarga de frameworks pesados[cite: 1, 2].
 
@@ -25,6 +26,17 @@ Crea un archivo `.env` en la raíz del proyecto basándote en el archivo de ejem
 PORT=3000
 MONGODB_URI=tu_cadena_de_conexion_de_mongodb_atlas
 ADMIN_EMAIL=tu_correo_de_administrador@saas.com
+APP_URL=http://localhost:3000
+BREVO_API_KEY=tu_clave_de_api_de_brevo
+MAIL_FROM=remitente_verificado_en_brevo@ejemplo.com
+```
+
+* `APP_URL`: URL base usada para construir el enlace de confirmación (en producción, la URL pública de Cloud Run, sin barra final).
+* `BREVO_API_KEY` y `MAIL_FROM`: clave de API de Brevo y remitente verificado en Brevo.
+* En Cloud Run, `MONGODB_URI` y `BREVO_API_KEY` se guardan en Secret Manager y se referencian como variables de entorno.
+
+## Confirmación de cuenta por correo
+Al registrarse, la cuenta queda `pendiente` y se envía un correo con un enlace (`/api/confirmar?token=…`) válido 24 horas. Al abrirlo, la cuenta pasa a `confirmado` y ya se puede iniciar sesión. Si el enlace caduca, al intentar iniciar sesión aparece el botón «Reenviar correo de confirmación».
 
 ## Instalación y Ejecución
 

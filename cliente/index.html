@@ -118,6 +118,10 @@
             background-color: #dc2626;
         }
 
+        .aviso { padding: 10px 12px; border-radius: 6px; font-size: 0.9rem; }
+        .aviso.ok { background: #dcfce7; color: #166534; }
+        .aviso.ko { background: #fee2e2; color: #991b1b; }
+
         .error { color: var(--error-color); font-size: 0.875rem; margin-top: 8px; }
         .success { color: var(--success-color); font-size: 0.875rem; margin-top: 8px; }
 
@@ -163,6 +167,7 @@
     <div class="container">
         <!-- VISTA DE LOGIN Y REGISTRO -->
         <div id="auth-view" class="vista activa">
+            <p id="confirmacion-msg" style="display: none;"></p>
             <h2>Iniciar Sesión</h2>
             <form id="login-form">
                 <div class="form-group">
@@ -176,6 +181,8 @@
                 <button type="submit">Entrar a la plataforma</button>
             </form>
             <p id="login-error" class="error"></p>
+            <button type="button" id="reenviar-btn" style="display: none; background-color: #0284c7;">Reenviar correo de confirmación</button>
+            <p id="reenviar-msg" class="success"></p>
 
             <hr class="divider">
 
@@ -247,10 +254,45 @@
             }
         }
 
+        // Resultado de abrir el enlace del correo (/api/confirmar redirige a /?confirmacion=...)
+        function mostrarResultadoConfirmacion() {
+            const params = new URLSearchParams(window.location.search);
+            const resultado = params.get('confirmacion');
+            if (!resultado) return;
+            const textos = {
+                ok: ['ok', 'Cuenta confirmada. Ya puedes iniciar sesión.'],
+                caducado: ['ko', 'El enlace de confirmación ha caducado. Intenta iniciar sesión y pulsa "Reenviar correo de confirmación".'],
+                invalido: ['ko', 'El enlace de confirmación no es válido o ya se ha usado.']
+            };
+            const [tipo, texto] = textos[resultado] || textos.invalido;
+            const msg = document.getElementById('confirmacion-msg');
+            msg.className = `aviso ${tipo}`;
+            msg.textContent = texto;
+            msg.style.display = 'block';
+            history.replaceState(null, '', '/');
+        }
+
+        const reenviarBtn = document.getElementById('reenviar-btn');
+        reenviarBtn.addEventListener('click', async () => {
+            const email = document.getElementById('login-email').value;
+            const msg = document.getElementById('reenviar-msg');
+            try {
+                const res = await RestClient.reenviarConfirmacion(email);
+                msg.className = 'success';
+                msg.textContent = res.mensaje;
+            } catch (err) {
+                msg.className = 'error';
+                msg.textContent = err.message;
+            }
+        });
+
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
+            document.getElementById('login-error').textContent = '';
+            document.getElementById('reenviar-msg').textContent = '';
+            reenviarBtn.style.display = 'none';
             try {
                 const res = await RestClient.login(email, password);
                 userEmailSpan.textContent = res.email;
@@ -261,6 +303,9 @@
                 mostrarVista(dashboardView);
             } catch (err) {
                 document.getElementById('login-error').textContent = err.message;
+                if (err.codigo === 'CUENTA_PENDIENTE') {
+                    reenviarBtn.style.display = 'block';
+                }
             }
         });
 
@@ -269,8 +314,8 @@
             const email = document.getElementById('reg-email').value;
             const password = document.getElementById('reg-password').value;
             try {
-                await RestClient.registrar(email, password);
-                document.getElementById('reg-success').textContent = '¡Registro exitoso! Cuenta pendiente de confirmación.';
+                const res = await RestClient.registrar(email, password);
+                document.getElementById('reg-success').textContent = res.mensaje;
                 document.getElementById('reg-error').textContent = '';
             } catch (err) {
                 document.getElementById('reg-error').textContent = err.message;
@@ -302,6 +347,7 @@
             mostrarVista(authView);
         });
 
+        mostrarResultadoConfirmacion();
         verificarSesionInicial();
     </script>
 </body>
