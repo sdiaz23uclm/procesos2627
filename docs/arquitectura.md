@@ -11,8 +11,10 @@ timestamp: 2026-11-17
 |---|---|---|
 | API y servidor HTTP | `servidor/api.js` | Crea el servidor, enruta solicitudes `/api/`, gestiona cookies/sesiones y sirve los ficheros del cliente. |
 | Lógica de negocio | `servidor/logica.js` | Normaliza email, registra e inicia sesión, consulta estado activo, lista usuarios y aplica reglas de eliminación. |
-| Acceso a datos | `servidor/datos.js` | Conecta a MongoDB. Usuarios: guardar, consultar (por email o por hash de token, ignorando cuentas `eliminado`), actualizar y borrado físico para deshacer un alta. Sesiones: crear, obtener, eliminar (colección `sesiones` con índice TTL). |
+| Acceso a datos | `servidor/datos.js` | Conecta a MongoDB. Usuarios: guardar, consultar (por email o por hash de token, ignorando cuentas `eliminado`), actualizar y borrado físico para deshacer un alta. Sesiones: crear, obtener, eliminar (colección `sesiones` con índice TTL). Partidas: obtener, crear (sustituye la anterior) y actualizar solo si la versión no ha cambiado (colección `partidas`). |
 | Gestión de sesiones (capa API) | `servidor/sesiones.js` | `GestorSesiones` genera el identificador de la cookie, guarda solo su hash con caducidad de 7 días y cierra las sesiones de una cuenta eliminada. |
+| Lógica del juego Alianzas | `servidor/juego/reglas.js`, `servidor/juego/ia.js` | Reglas puras (crear partida, validar y aplicar acciones, rondas, recargas, fin de partida) y las 3 personalidades de IA. Reciben el tiempo y el azar como parámetros. |
+| Lógica de partidas | `servidor/logicaPartidas.js` | Carga la partida del usuario, avanza su reloj (como mucho 3 s por petición, D-20), aplica la acción y la guarda con control de versión (D-21). |
 | Servicio externo de OAuth | `servidor/oauth.js` | `ClienteOAuthGoogle` construye la URL de autorización de Google y cambia el código por el email verificado. |
 | Servicio externo de correo | `servidor/correo.js` | `ServicioCorreoBrevo` envía el enlace de confirmación por la API HTTP de Brevo. |
 
@@ -23,7 +25,8 @@ timestamp: 2026-11-17
 | Capa | Archivo | Responsabilidad comprobada |
 |---|---|---|
 | Presentación | `cliente/index.html` | Contiene el marcado, estilos y código de interfaz para registro, inicio de sesión, panel y listado de usuarios. |
-| Comunicación | `cliente/rest.js` | Contiene todas las llamadas `fetch` (registro, inicio y cierre de sesión, reenvío de confirmación, listado, consulta de actividad y eliminación) y la navegación al login con Google. |
+| Presentación del juego | `cliente/juego.js`, `cliente/juego.css` | Selección de país, tablero, menú de atacar o dar punto, temporizadores y panel de países. Consulta el estado cada 500 ms; no contiene reglas. |
+| Comunicación | `cliente/rest.js` | Contiene todas las llamadas `fetch` (registro, inicio y cierre de sesión, reenvío de confirmación, listado, consulta de actividad y eliminación) la navegación al login con Google y las llamadas del juego. |
 
 **Frontera:** la interfaz invoca `RestClient`; este intercambia JSON con rutas relativas `/api/...`. La página no hace ningún `fetch` directamente. El navegador no se conecta a MongoDB. El servidor sirve los archivos estáticos desde `cliente/` y la API bajo el mismo origen.
 
@@ -42,6 +45,12 @@ timestamp: 2026-11-17
 | `GET` | `/api/usuarios` | Administrador con sesión válida; el rechazo de acceso termina en `403`. Devuelve email, rol, estado y activo. |
 | `GET` | `/api/usuarios/activo?email=…` | Administrador con sesión válida (`403` si no). |
 | `DELETE` | `/api/eliminar` | Usuario con sesión válida (`401` si no); la lógica limita al usuario normal a su propia cuenta (`403`). Borrado lógico y cierre de sesiones de la cuenta. |
+| `GET` | `/api/paises` | Usuario con sesión. |
+| `GET` | `/api/partida` | Usuario con sesión; devuelve su partida tras avanzar el reloj o `404` si no tiene. |
+| `POST` | `/api/partida` | Usuario con sesión; crea una partida con el país `{ pais }`. |
+| `POST` | `/api/partida/accion` | Usuario con sesión; `{ tipo: 'atacar'|'regalar', objetivo }`, `{ tipo: 'mover', x, y }` o `{ tipo: 'expandir' }`. Error `400` si las reglas no lo permiten, `409` si está en pausa o terminada. |
+| `POST` | `/api/partida/guardar` | Usuario con sesión; guarda y pausa. |
+| `POST` | `/api/partida/reanudar` | Usuario con sesión. |
 | `POST` | `/api/logout` | Cualquiera; invalida la sesión si recibe su cookie. |
 
 Las cookies de sesión se generan con `crypto.randomBytes` y llevan `HttpOnly`, `SameSite=Lax` y, si `APP_URL` es https, `Secure`.

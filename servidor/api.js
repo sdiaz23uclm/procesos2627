@@ -9,6 +9,7 @@ import { LogicaUsuarios, normalizarEmail } from './logica.js';
 import { ServicioCorreoBrevo } from './correo.js';
 import { ClienteOAuthGoogle } from './oauth.js';
 import { GestorSesiones, DURACION_SESION_MS } from './sesiones.js';
+import { LogicaPartidas } from './logicaPartidas.js';
 
 // Cargar variables de entorno del archivo .env
 dotenv.config();
@@ -35,6 +36,7 @@ const PORT = process.env.PORT || 8080;
 
 // Sesiones persistidas en MongoDB (D-13): sobreviven a reinicios y a varias instancias
 const sesiones = new GestorSesiones(dao);
+const logicaPartidas = new LogicaPartidas(dao);
 
 function parsearCookies(req) {
   const list = {};
@@ -58,8 +60,72 @@ const ESTADO_HTTP = {
   NO_AUTENTICADO: 401,
   SIN_PERMISOS: 403,
   USUARIO_NO_ENCONTRADO: 404,
+  PARTIDA_NO_ENCONTRADA: 404,
+  PARTIDA_PAUSADA: 409,
+  PARTIDA_TERMINADA: 409,
   CORREO_NO_ENVIADO: 502,
 };
+
+// Lee el cuerpo JSON de la petición (objeto vacío si no hay cuerpo)
+function leerJSON(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > 10_000) reject(new SyntaxError('Cuerpo demasiado grande'));
+    });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+// Rutas de Alianzas: todas exigen sesión. Devuelve true si ha atendido la petición.
+async function rutasPartida(req, res, pathname) {
+  if (!pathname.startsWith('/api/partida') && pathname !== '/api/paises') return false;
+
+  const usuario = await verificarSesionValida(req);
+  if (!usuario) {
+    res.writeHead(401);
+    res.end(JSON.stringify({ mensaje: 'Tu sesión ha caducado. Inicia sesión de nuevo.', codigo: 'NO_AUTENTICADO' }));
+    return true;
+  }
+
+  const responder = (estado, datos) => {
+    res.writeHead(estado);
+    res.end(JSON.stringify(datos));
+  };
+
+  try {
+    if (pathname === '/api/paises' && req.method === 'GET') {
+      responder(200, logicaPartidas.listarPaises());
+    } else if (pathname === '/api/partida' && req.method === 'GET') {
+      const vista = await logicaPartidas.consultar(usuario.email);
+      if (vista) responder(200, vista);
+      else responder(404, { mensaje: 'No tienes ninguna partida guardada.', codigo: 'PARTIDA_NO_ENCONTRADA' });
+    } else if (pathname === '/api/partida' && req.method === 'POST') {
+      const { pais } = await leerJSON(req);
+      responder(201, await logicaPartidas.nuevaPartida(usuario.email, pais));
+    } else if (pathname === '/api/partida/accion' && req.method === 'POST') {
+      responder(200, await logicaPartidas.actuar(usuario.email, await leerJSON(req)));
+    } else if (pathname === '/api/partida/guardar' && req.method === 'POST') {
+      responder(200, await logicaPartidas.guardar(usuario.email));
+    } else if (pathname === '/api/partida/reanudar' && req.method === 'POST') {
+      responder(200, await logicaPartidas.reanudar(usuario.email));
+    } else {
+      responder(404, { mensaje: 'Ruta API no encontrada' });
+    }
+  } catch (err) {
+    if (!err.codigo && !(err instanceof SyntaxError)) throw err; // error inesperado: 500 en el manejador general
+    responderError(res, err);
+  }
+  return true;
+}
 
 function responderError(res, err, estadoPorDefecto = 400) {
   res.writeHead(ESTADO_HTTP[err.codigo] || estadoPorDefecto);
@@ -105,6 +171,9 @@ async function atenderPeticion(req, res) {
   // --- API ROUTES ---
   if (pathname.startsWith('/api/')) {
     res.setHeader('Content-Type', 'application/json');
+
+    // ALIANZAS
+    if (await rutasPartida(req, res, pathname)) return;
 
     // NORMALIZAR Y VALIDAR EMAIL
     if (pathname === '/api/prueba/email' && req.method === 'POST') {
@@ -304,6 +373,7 @@ async function atenderPeticion(req, res) {
           await logica.eliminarUsuario(usuarioActual.email, emailTarget);
           const emailEliminado = normalizarEmail(emailTarget);
           await sesiones.cerrarTodasDe(emailEliminado);
+          await logicaPartidas.eliminarPartidaDe(emailEliminado);
           if (emailEliminado === usuarioActual.email) {
             res.setHeader('Set-Cookie', `sessionId=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${COOKIE_SECURE}`);
           }

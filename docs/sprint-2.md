@@ -7,7 +7,13 @@ timestamp: 2026-10-28
 
 ## Objetivo
 
-Desarrollar el juego «Alianzas» sobre la base del Sprint 1. Por definir en detalle.
+Desarrollar el juego «Alianzas» sobre la base del Sprint 1.
+
+## Primera versión (rama `feature/alianzas-base`)
+
+Partida de 1 jugador contra 3 IAs en un mapa de 12 x 12, con rondas simultáneas de 10 s, puntos de acción (+2 cada 30 s, tope 6), radio cuadrado inicial 3, 3 vidas, guardado automático y manual en MongoDB. Decisiones D-14 a D-21. Pruebas en `tests/reglas.test.js`, `tests/ia.test.js` y `tests/partidas.test.js`.
+
+Pendiente para versiones siguientes: TODO(alumno) (por ejemplo, partidas entre varios jugadores humanos).
 
 ## Requisitos que pasan desde Sprint 1
 

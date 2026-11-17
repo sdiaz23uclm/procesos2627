@@ -1,6 +1,6 @@
-# procesos2627 — CloudSaaS Platform
+# procesos2627 — Alianzas
 
-Proyecto individual de Procesos de Ingeniería del Software (curso 2026-2027). Aplicación tipo SaaS con arquitectura en capas y gestión de usuarios: registro con confirmación por correo, inicio de sesión local y con Google, roles de usuario y administrador, y persistencia en MongoDB. Será la base del juego «Alianzas» (Sprint 2).
+Proyecto individual de Procesos de Ingeniería del Software (curso 2026-2027). Aplicación tipo SaaS con arquitectura en capas y gestión de usuarios (registro con confirmación por correo, inicio de sesión local y con Google, roles de usuario y administrador, persistencia en MongoDB) sobre la que se construye el juego de estrategia **Alianzas**.
 
 **URL pública:** https://procesos26-27-1061448815388.europe-southwest1.run.app
 
@@ -28,12 +28,16 @@ Las decisiones de diseño y sus motivos están en [`docs/decisiones.md`](docs/de
 servidor/
   api.js        capa API: servidor HTTP, rutas, cookies (y composición de dependencias)
   sesiones.js   capa API: gestión de sesiones
-  logica.js     capa de lógica de negocio (no conoce HTTP ni servicios externos)
+  logica.js     capa de lógica de negocio de usuarios (no conoce HTTP ni servicios externos)
+  logicaPartidas.js  capa de lógica: partidas de Alianzas
+  juego/reglas.js    capa de lógica: reglas puras del juego
+  juego/ia.js        capa de lógica: las 3 IAs
   datos.js      capa de acceso a datos (MongoDB)
   correo.js     servicio externo de correo (Brevo)
   oauth.js      servicio externo de OAuth (Google)
 cliente/
-  index.html    capa de presentación
+  index.html    capa de presentación (cuentas y panel)
+  juego.js/.css capa de presentación del juego
   rest.js       capa de comunicación con el servidor
 tests/          pruebas automatizadas (node:test)
 docs/           documentación del proyecto (bundle OKF)
@@ -93,6 +97,18 @@ Las credenciales de prueba del administrador se envían junto con la entrega, no
 - **Usuario activo.** Ha confirmado su correo o entró con Google, y no ha sido eliminado.
 - **Eliminar cuenta.** Borrado lógico: la cuenta queda `eliminado`, no puede volver a iniciar sesión y se cierran sus sesiones. El mismo email puede registrarse de nuevo como cuenta nueva.
 - **Errores.** Cada error se muestra junto al formulario que lo provocó; los errores inesperados del servidor devuelven un mensaje genérico en lugar de tumbar la aplicación. La actividad relevante se registra en el log con el prefijo `[LOG]`.
+
+## Alianzas
+
+Desde el panel, «Jugar a Alianzas». Eliges tu país y juegas contra 3 IAs (agresiva, diplomática y equilibrada) en un mapa de 12 x 12:
+
+- Rondas simultáneas de 10 s; las acciones se aplican al instante.
+- Cada país tiene 3 vidas, empieza con 2 puntos de acción y recibe +2 cada 30 s (máximo 6). Cada acción cuesta 1 punto: **atacar** (quita una vida), **dar un punto**, **moverse** una casilla (también en diagonal, nunca a una ocupada) o **ampliar el radio** de acción (empieza en 3, en cuadrado).
+- Haz click en una casilla contigua para moverte o en un país dentro de tu radio (zona azul) para atacarle o darle un punto.
+- Un país sin vidas queda en el mapa con la bandera apagada y una ✖ roja. Gana el último en pie.
+- La partida se guarda en MongoDB en cada ronda; «Guardar y pausar» la deja en pausa. Si cierras la página, la partida se detiene sola y la continúas al volver.
+
+Toda la lógica se ejecuta en el servidor (el navegador solo dibuja y consulta cada 500 ms). Decisiones D-14 a D-21 en [`docs/decisiones.md`](docs/decisiones.md).
 
 ## Flujo de trabajo y CI/CD
 
