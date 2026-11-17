@@ -1,4 +1,5 @@
 import http from 'node:http';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,6 +7,7 @@ import dotenv from 'dotenv';
 import { BaseDatosMongoDB } from './datos.js';
 import { LogicaUsuarios, normalizarEmail } from './logica.js';
 import { ServicioCorreoBrevo } from './correo.js';
+import { ClienteOAuthGoogle } from './oauth.js';
 
 // Cargar variables de entorno del archivo .env
 dotenv.config();
@@ -21,6 +23,13 @@ const servicioCorreo = new ServicioCorreoBrevo({
   urlApp: process.env.APP_URL,
 });
 const logica = new LogicaUsuarios(dao, servicioCorreo);
+const clienteOAuth = new ClienteOAuthGoogle({
+  clientId: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  urlApp: process.env.APP_URL,
+});
+// En producción (https) las cookies llevan Secure; en localhost (http) no podrían enviarse
+const COOKIE_SECURE = (process.env.APP_URL || '').startsWith('https://') ? '; Secure' : '';
 const PORT = process.env.PORT || 8080;
 
 // Almacenamiento simple de sesiones en memoria
@@ -34,6 +43,13 @@ function parsearCookies(req) {
     list[parts.shift().trim()] = decodeURI(parts.join('='));
   });
   return list;
+}
+
+// Crea una sesión para el usuario y devuelve la cabecera Set-Cookie
+function crearSesion(email) {
+  const sessionId = crypto.randomBytes(32).toString('hex');
+  sesionesActivas.set(sessionId, email);
+  return `sessionId=${sessionId}; Path=/; HttpOnly; SameSite=Lax${COOKIE_SECURE}`;
 }
 
 // Traduce errores internos a mensajes comprensibles para el usuario
@@ -121,10 +137,7 @@ const server = http.createServer(async (req, res) => {
           const { email, password } = JSON.parse(body);
           const usuario = await logica.loginUsuario(email, password);
           
-          const sessionId = Math.random().toString(36).substring(2);
-          sesionesActivas.set(sessionId, usuario.email);
-
-          res.setHeader('Set-Cookie', `sessionId=${sessionId}; Path=/; HttpOnly`);
+          res.setHeader('Set-Cookie', crearSesion(usuario.email));
           res.writeHead(200);
           res.end(JSON.stringify({ email: usuario.email, rol: usuario.rol }));
         } catch (err) {
@@ -132,6 +145,47 @@ const server = http.createServer(async (req, res) => {
           res.end(JSON.stringify({ mensaje: mensajeError(err), codigo: err.codigo }));
         }
       });
+      return;
+    }
+
+    // OAUTH GOOGLE: paso 1, redirigir a Google (RF-04)
+    if (pathname === '/api/auth/google' && req.method === 'GET') {
+      // state aleatorio guardado en cookie: protege el callback frente a CSRF
+      const state = crypto.randomBytes(16).toString('hex');
+      res.writeHead(302, {
+        'Set-Cookie': `oauthState=${state}; Path=/api/auth; HttpOnly; SameSite=Lax; Max-Age=600${COOKIE_SECURE}`,
+        Location: clienteOAuth.urlAutorizacion(state),
+      });
+      res.end();
+      return;
+    }
+
+    // OAUTH GOOGLE: paso 2, Google vuelve aquí con ?code=...&state=...
+    if (pathname === '/api/auth/google/callback' && req.method === 'GET') {
+      const borrarState = `oauthState=; Path=/api/auth; HttpOnly; SameSite=Lax; Max-Age=0${COOKIE_SECURE}`;
+      const params = urlObj.searchParams;
+      let destino;
+      const cookies = [borrarState];
+      try {
+        if (params.get('error')) {
+          console.log(`[LOG] Login con Google cancelado o rechazado por el usuario`);
+          destino = '/?oauth=cancelado';
+        } else {
+          const stateCookie = parsearCookies(req).oauthState;
+          if (!stateCookie || stateCookie !== params.get('state')) {
+            throw new Error('Parámetro state de OAuth inválido');
+          }
+          const email = await clienteOAuth.obtenerEmail(params.get('code'));
+          const usuario = await logica.loginOAuth(email);
+          cookies.push(crearSesion(usuario.email));
+          destino = '/';
+        }
+      } catch (err) {
+        console.log(`[LOG] Error en el login con Google: ${err.message}`);
+        destino = '/?oauth=error';
+      }
+      res.writeHead(302, { 'Set-Cookie': cookies, Location: destino });
+      res.end();
       return;
     }
 
@@ -227,7 +281,7 @@ const server = http.createServer(async (req, res) => {
       if (cookies.sessionId) {
         sesionesActivas.delete(cookies.sessionId);
       }
-      res.setHeader('Set-Cookie', 'sessionId=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT');
+      res.setHeader('Set-Cookie', `sessionId=; Path=/; HttpOnly; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT${COOKIE_SECURE}`);
       res.writeHead(200);
       res.end(JSON.stringify({ mensaje: 'Sesión cerrada' }));
       return;

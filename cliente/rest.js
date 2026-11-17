@@ -40,6 +40,11 @@ const RestClient = {
     return datos;
   },
 
+  // El login con Google es una navegación completa (no fetch): Google tiene que mostrar su página
+  iniciarLoginGoogle() {
+    window.location.href = '/api/auth/google';
+  },
+
   async comprobarSesion() {
     const respuesta = await fetch('/api/sesion');
     if (!respuesta.ok) return null;

@@ -29,14 +29,22 @@ ADMIN_EMAIL=tu_correo_de_administrador@saas.com
 APP_URL=http://localhost:3000
 BREVO_API_KEY=tu_clave_de_api_de_brevo
 MAIL_FROM=remitente_verificado_en_brevo@ejemplo.com
+GOOGLE_CLIENT_ID=tu_client_id_de_google
+GOOGLE_CLIENT_SECRET=tu_client_secret_de_google
 ```
 
 * `APP_URL`: URL base usada para construir el enlace de confirmación (en producción, la URL pública de Cloud Run, sin barra final).
 * `BREVO_API_KEY` y `MAIL_FROM`: clave de API de Brevo y remitente verificado en Brevo.
-* En Cloud Run, `MONGODB_URI` y `BREVO_API_KEY` se guardan en Secret Manager y se referencian como variables de entorno.
+* `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`: credenciales del cliente OAuth (tipo «Aplicación web») creado en Google Cloud.
+* En Cloud Run, `MONGODB_URI`, `BREVO_API_KEY` y `GOOGLE_CLIENT_SECRET` se guardan en Secret Manager y se referencian como variables de entorno.
 
 ## Confirmación de cuenta por correo
 Al registrarse, la cuenta queda `pendiente` y se envía un correo con un enlace (`/api/confirmar?token=…`) válido 24 horas. Al abrirlo, la cuenta pasa a `confirmado` y ya se puede iniciar sesión. Si el enlace caduca, al intentar iniciar sesión aparece el botón «Reenviar correo de confirmación».
+
+Los correos a dominios de la universidad pueden quedar retenidos por su filtro; para probar, usa otro buzón.
+
+## Inicio de sesión con Google
+El botón «Entrar con Google» usa OAuth 2.0 (flujo de código de autorización). En Google Cloud, el cliente OAuth debe tener registradas exactamente estas URI de redireccionamiento: `http://localhost:3000/api/auth/google/callback` (desarrollo) y `<APP_URL>/api/auth/google/callback` (producción). Si ya existía una cuenta local pendiente con el mismo email, se vincula y queda confirmada.
 
 ## Instalación y Ejecución
 

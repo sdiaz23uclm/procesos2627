@@ -37,6 +37,12 @@ export function normalizarEmail(email) {
   return emailNormalizado;
 }
 
+// Rol según ADMIN_EMAIL (decisión D-05): se aplica igual en registro local y en OAuth
+function rolPara(emailNormalizado, rolPorDefecto = 'usuario') {
+  const adminEmailConfig = process.env.ADMIN_EMAIL;
+  return (adminEmailConfig && emailNormalizado === adminEmailConfig.trim().toLowerCase()) ? 'admin' : rolPorDefecto;
+}
+
 export class LogicaUsuarios {
   /**
    * @param dao            capa de acceso a datos
@@ -80,8 +86,7 @@ export class LogicaUsuarios {
     const passwordHash = await bcrypt.hash(password, salt);
 
     // Si coincide con el email de administración configurado por variable de entorno, es admin
-    const adminEmailConfig = process.env.ADMIN_EMAIL;
-    const rol = (adminEmailConfig && emailNormalizado === adminEmailConfig.trim().toLowerCase()) ? "admin" : rolParam;
+    const rol = rolPara(emailNormalizado, rolParam);
 
     const { token, campos } = this.generarTokenConfirmacion();
     const usuario = {
@@ -164,7 +169,12 @@ export class LogicaUsuarios {
       throw errorNegocio('CUENTA_PENDIENTE', 'La cuenta está pendiente de confirmación. Revisa tu correo.');
     }
     
-    const passwordValida = await bcrypt.compare(password, usuario.passwordHash);
+    if (!usuario.passwordHash) {
+      console.log(`[LOG] Intento de login local en una cuenta creada con Google: ${emailNormalizado}`);
+      throw errorNegocio('CUENTA_OAUTH', 'Esta cuenta se creó con Google. Usa el botón "Entrar con Google".');
+    }
+
+    const passwordValida = await bcrypt.compare(password ?? '', usuario.passwordHash);
     if (!passwordValida) {
       console.log(`[LOG] Intento de login fallido - Contraseña incorrecta para: ${emailNormalizado}`);
       throw new Error("Credenciales inválidas");
@@ -172,6 +182,39 @@ export class LogicaUsuarios {
 
     console.log(`[LOG] Login exitoso: ${emailNormalizado}`);
     return usuario;
+  }
+
+  /**
+   * Inicio de sesión con un proveedor externo (RF-04). Recibe un email ya verificado por el
+   * proveedor; la lógica no sabe cuál es ni cómo se habló con él.
+   * - Si no existe: se crea con estado 'oauth' y sin contraseña.
+   * - Si existe y estaba pendiente: se vincula y queda confirmada (decisión D-11).
+   */
+  async loginOAuth(email) {
+    const emailNormalizado = normalizarEmail(email);
+    const existente = await this.dao.obtenerPorEmail(emailNormalizado);
+
+    if (!existente) {
+      const usuario = {
+        email: emailNormalizado,
+        passwordHash: null,
+        rol: rolPara(emailNormalizado),
+        estado: 'oauth',
+      };
+      const guardado = await this.dao.guardar(usuario);
+      console.log(`[LOG] Usuario creado mediante OAuth: ${emailNormalizado} con rol [${usuario.rol}]`);
+      return guardado;
+    }
+
+    if (existente.estado === 'pendiente') {
+      const cambios = { estado: 'confirmado', tokenConfirmacionHash: null, tokenConfirmacionExpira: null };
+      await this.dao.actualizar(emailNormalizado, cambios);
+      Object.assign(existente, cambios);
+      console.log(`[LOG] Cuenta local vinculada con OAuth y confirmada: ${emailNormalizado}`);
+    }
+
+    console.log(`[LOG] Login OAuth exitoso: ${emailNormalizado}`);
+    return existente;
   }
 
   async listarUsuarios(usuarioActual) {
