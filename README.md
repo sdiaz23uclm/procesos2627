@@ -102,13 +102,15 @@ Las credenciales de prueba del administrador se envían junto con la entrega, no
 
 Desde el panel, «Jugar a Alianzas». Eliges tu país y juegas contra 3 IAs (agresiva, diplomática y equilibrada) en un mapa de 12 x 12:
 
-- Rondas simultáneas de 10 s; las acciones se aplican al instante.
-- Cada país tiene 3 vidas, empieza con 2 puntos de acción y recibe +2 cada 30 s (máximo 6). Cada acción cuesta 1 punto: **atacar** (quita una vida), **dar un punto**, **moverse** una casilla (también en diagonal, nunca a una ocupada) o **ampliar el radio** de acción (empieza en 3, en cuadrado).
-- Haz click en una casilla contigua para moverte o en un país dentro de tu radio (zona azul) para atacarle o darle un punto.
+- Cada ronda dura 30 s: empieza con +2 puntos para todos (máximo 6) y un **turno de 10 s** en el que puedes actuar tantas veces como puntos tengas. Los 20 s siguientes nadie puede actuar. Si no actúas en tus 10 s, pierdes ese turno (los puntos se guardan).
+- Cada país tiene 3 vidas. Cada acción cuesta 1 punto: **atacar** (quita 1 vida), **dar un punto**, **moverse** una casilla (también en diagonal, nunca a una ocupada) o **ampliar el radio**.
+- La zona de acción (en azul) empieza siendo un cuadrado de 7 x 7; al ampliarla solo crecen los brazos hacia arriba, abajo y los lados.
+- Haz click en una casilla contigua para moverte o en un país dentro de tu zona para atacarle o darle un punto.
 - Un país sin vidas queda en el mapa con la bandera apagada y una ✖ roja. Gana el último en pie.
 - La partida se guarda en MongoDB en cada ronda; «Guardar y pausar» la deja en pausa. Si cierras la página, la partida se detiene sola y la continúas al volver.
+- El panel y la parte inferior del tablero incluyen un tutorial con las reglas y los contadores.
 
-Toda la lógica se ejecuta en el servidor (el navegador solo dibuja y consulta cada 500 ms). Decisiones D-14 a D-21 en [`docs/decisiones.md`](docs/decisiones.md).
+Toda la lógica se ejecuta en el servidor (el navegador solo dibuja y consulta cada 500 ms). Decisiones D-14 a D-23 en [`docs/decisiones.md`](docs/decisiones.md).
 
 ## Flujo de trabajo y CI/CD
 

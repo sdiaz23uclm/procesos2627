@@ -133,7 +133,9 @@ export class LogicaPartidas {
       autoguardadoRonda: doc.autoguardadoRonda,
       tuPais: humano.id,
       ...relojes(e),
-      duracionRondaMs: CONFIG.DURACION_RONDA_MS,
+      duracionTurnoMs: CONFIG.DURACION_TURNO_MS,
+      duracionCicloMs: CONFIG.DURACION_CICLO_MS,
+      anchoBrazos: CONFIG.ANCHO_BRAZOS,
       topePuntos: CONFIG.TOPE_PUNTOS,
       jugadores: e.jugadores.map(j => ({
         id: j.id,
@@ -146,6 +148,7 @@ export class LogicaPartidas {
         puntos: j.puntos,
         radio: j.radio,
         vivo: j.vivo,
+        actuoEnRonda: j.actuoEnRonda,
       })),
       eventos: [...e.eventos].reverse(),
     };

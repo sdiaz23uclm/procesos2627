@@ -60,6 +60,12 @@ const Juego = (() => {
   }
 
   const distancia = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+  // Solo para pintar la zona azul; el servidor es quien decide si una acción es válida (D-23)
+  const enRadio = (j, c) => {
+    const dx = Math.abs(j.x - c.x);
+    const dy = Math.abs(j.y - c.y);
+    return Math.max(dx, dy) <= j.radio && Math.min(dx, dy) <= partida.anchoBrazos;
+  };
   const yo = () => partida.jugadores.find(j => j.id === partida.tuPais);
 
   function mensaje(texto, ok = false) {
@@ -223,6 +229,8 @@ const Juego = (() => {
       botones: el('div', { class: 'juego-botones' }),
       clavesBotones: '',
       ronda: el('strong'),
+      etiquetaTurno: el('span'),
+      cajaTurno: null,
       barra: el('div'),
       temporizador: null,
       puntos: el('strong'),
@@ -237,12 +245,13 @@ const Juego = (() => {
       guardado: el('p', { class: 'ayuda' }),
     };
     ui.temporizador = el('div', { class: 'temporizador' }, ui.barra);
+    ui.cajaTurno = el('div', { class: 'dato dato-turno' }, [ui.etiquetaTurno, ui.ronda, ui.temporizador]);
     ui.raiz = el('div', { class: 'juego' }, [
       el('div', { class: 'juego-cabecera' }, [ui.titulo, ui.botones]),
       el('div', { class: 'juego-estado' }, [
-        el('div', { class: 'dato' }, ['Ronda termina en', ui.ronda, ui.temporizador]),
+        ui.cajaTurno,
         el('div', { class: 'dato' }, ['Tus puntos de acción', ui.puntos]),
-        el('div', { class: 'dato' }, ['Recarga +2 en', ui.recarga]),
+        el('div', { class: 'dato' }, ['Próxima recarga (+2) en', ui.recarga]),
         el('div', { class: 'dato' }, ['Tus vidas · radio', ui.vidas]),
       ]),
       el('p', { class: 'juego-msg' }),
@@ -252,8 +261,11 @@ const Juego = (() => {
           el('h3', { text: 'Países' }), ui.paises,
           el('h3', { text: 'Últimos sucesos' }), ui.eventos,
           ui.guardado,
-          el('p', { class: 'ayuda', text: 'Haz click en una casilla contigua para moverte, o en un país dentro de tu radio (zona azul) para atacarle o darle un punto. Cada acción cuesta 1 punto; los que no gastes se acumulan hasta 6.' }),
         ]),
+      ]),
+      el('details', { class: 'tutorial-plegable', open: '' }, [
+        el('summary', { text: 'Cómo se juega (recordatorio)' }),
+        crearTutorial(),
       ]),
     ]);
     raiz.replaceChildren(ui.raiz);
@@ -262,11 +274,23 @@ const Juego = (() => {
   function actualizarCabecera() {
     const p = partida;
     const mio = yo();
-    const s = Math.ceil(p.msRestantesRonda / 1000);
+    const enTurno = p.fase === 'turno';
     ui.titulo.textContent = `Alianzas · Ronda ${p.ronda}`;
-    ui.ronda.textContent = `${s} s`;
-    ui.barra.style.width = `${(p.msRestantesRonda / p.duracionRondaMs) * 100}%`;
-    ui.temporizador.classList.toggle('urgente', s <= 3);
+    if (enTurno) {
+      const s = Math.ceil(p.msRestantesTurno / 1000);
+      ui.etiquetaTurno.textContent = mio.actuoEnRonda ? 'Tu turno · ya has actuado' : '¡Tu turno! Actúa antes de';
+      ui.ronda.textContent = `${s} s`;
+      ui.barra.style.width = `${(p.msRestantesTurno / p.duracionTurnoMs) * 100}%`;
+      ui.temporizador.classList.toggle('urgente', s <= 3);
+    } else {
+      const espera = p.duracionCicloMs - p.duracionTurnoMs;
+      ui.etiquetaTurno.textContent = 'Turno cerrado · el siguiente en';
+      ui.ronda.textContent = `${Math.ceil(p.msHastaRecarga / 1000)} s`;
+      ui.barra.style.width = `${((espera - p.msHastaRecarga) / espera) * 100}%`;
+      ui.temporizador.classList.remove('urgente');
+    }
+    ui.cajaTurno.classList.toggle('abierto', enTurno && p.estado === 'en_curso' && !p.pausada);
+    ui.temporizador.classList.toggle('espera', !enTurno);
     ui.recarga.textContent = `${Math.ceil(p.msHastaRecarga / 1000)} s`;
 
     const pips = el('span', { class: 'pips' });
@@ -275,10 +299,10 @@ const Juego = (() => {
     ui.vidas.replaceChildren(corazones(mio.vidas), ` · ${mio.radio}`);
 
     // Los botones solo se recrean si cambia la situación (pausa, fin, eliminado)
-    const clave = `${p.estado}|${p.pausada}|${mio.vivo}`;
+    const clave = `${p.estado}|${p.pausada}|${mio.vivo}|${p.fase}`;
     if (clave === ui.clavesBotones) return;
     ui.clavesBotones = clave;
-    const puedeJugar = p.estado === 'en_curso' && !p.pausada && mio.vivo;
+    const puedeJugar = p.estado === 'en_curso' && !p.pausada && mio.vivo && enTurno;
     ui.botones.replaceChildren(
       el('button', { text: 'Ampliar radio (1 punto)', onclick: () => actuar({ tipo: 'expandir' }), ...(puedeJugar ? {} : { disabled: '' }) }),
       p.estado === 'en_curso'
@@ -294,6 +318,7 @@ const Juego = (() => {
     const p = partida;
     const mio = yo();
     const porCasilla = new Map(p.jugadores.map(j => [`${j.x},${j.y}`, j]));
+    ui.tablero.classList.toggle('en-espera', p.fase !== 'turno');
 
     for (let y = 0; y < p.tam; y++) {
       for (let x = 0; x < p.tam; x++) {
@@ -301,7 +326,7 @@ const Juego = (() => {
         const ocupante = porCasilla.get(`${x},${y}`);
         const d = distancia(mio, { x, y });
         const clases = ['celda'];
-        if (mio.vivo && d <= mio.radio) clases.push('en-radio');
+        if (mio.vivo && enRadio(mio, { x, y })) clases.push('en-radio');
         if (mio.vivo && d === 1) clases.push('contigua');
         if (ocupante) {
           clases.push('ocupada');
@@ -378,7 +403,11 @@ const Juego = (() => {
 
     cerrarMenu();
     if (ocupante && ocupante.id === mio.id) return;
-    if (d > mio.radio) {
+    if (p.fase !== 'turno') {
+      mensaje(`Tu turno ha terminado. El siguiente empieza en ${Math.ceil(p.msHastaRecarga / 1000)} s.`);
+      return;
+    }
+    if (!enRadio(mio, { x, y })) {
       mensaje('Esa casilla está fuera de tu radio de acción.');
       return;
     }
@@ -411,5 +440,62 @@ const Juego = (() => {
     menuAbierto = null;
   }
 
-  return { abrir, cerrar };
+  // --- Tutorial: se muestra en el panel y, plegable, debajo del tablero ---
+  function crearTutorial() {
+    const pips = el('span', { class: 'pips' }, [
+      el('span', { class: 'lleno' }), el('span', { class: 'lleno' }), el('span', {}), el('span', {}), el('span', {}), el('span', {}),
+    ]);
+    const muestraEliminado = el('span', { class: 'muestra-celda celda eliminado' }, bandera('fr'));
+    const muestraRadio = el('span', { class: 'muestra-radio' });
+    // Ejemplo de radio ampliado de 3 a 5: el cuadrado de 7 x 7 con los brazos alargados 2 casillas
+    const ejemplo = [];
+    for (let dy = -5; dy <= 5; dy++) {
+      let fila = '';
+      for (let dx = -5; dx <= 5; dx++) {
+        fila += dx === 0 && dy === 0 ? 'P' : (Math.min(Math.abs(dx), Math.abs(dy)) <= 3 ? '#' : '.');
+      }
+      ejemplo.push(fila);
+    }
+    for (const fila of ejemplo) {
+      for (const c of fila) muestraRadio.appendChild(el('span', { class: c === '#' ? 'r' : (c === 'P' ? 'p' : '') }));
+    }
+
+    const paso = (titulo, hijos) => el('div', { class: 'paso' }, [el('h4', { text: titulo }), ...hijos]);
+    return el('div', { class: 'tutorial' }, [
+      paso('🎯 Objetivo', [
+        el('p', { text: 'Eres un país en un mapa de 12 x 12 contra 3 países controlados por IAs. Gana el último que quede en pie.' }),
+      ]),
+      paso('⏱ Rondas y turnos', [
+        el('p', { text: 'Cada ronda dura 30 s. Al empezar, todos reciben +2 puntos de acción y se abre un turno de 10 s para actuar. Puedes hacer tantas acciones como puntos tengas. Después hay 20 s de espera en los que nadie puede actuar.' }),
+        el('p', { text: 'Si no actúas en tus 10 s, pierdes ese turno (los puntos que no gastes se guardan, hasta un máximo de 6).' }),
+      ]),
+      paso('🕹 Acciones (1 punto cada una)', [
+        el('ul', {}, [
+          el('li', {}, [el('strong', { text: 'Atacar: ' }), 'quita 1 vida a un país dentro de tu radio.']),
+          el('li', {}, [el('strong', { text: 'Dar 1 punto: ' }), 'regalas un punto a otro país (alianzas).']),
+          el('li', {}, [el('strong', { text: 'Moverse: ' }), 'a una casilla contigua libre (también en diagonal).']),
+          el('li', {}, [el('strong', { text: 'Ampliar radio: ' }), 'tu zona crece 1 casilla hacia arriba, abajo y los lados.']),
+        ]),
+        el('p', { text: 'Haz click en un país de tu zona azul para atacarle o darle un punto, o en una casilla contigua para moverte.' }),
+      ]),
+      paso('📊 Contadores', [
+        el('ul', {}, [
+          el('li', {}, [el('strong', { text: 'Tu turno: ' }), 'segundos que te quedan para actuar (o para el siguiente turno).']),
+          el('li', {}, [el('strong', { text: 'Puntos: ' }), pips, ' círculos llenos = puntos disponibles (máx. 6).']),
+          el('li', {}, [el('strong', { text: 'Próxima recarga: ' }), 'cuándo llegan los siguientes +2 puntos.']),
+          el('li', {}, [el('strong', { text: 'Vidas: ' }), corazones(2), ' cada país tiene 3; cada ataque quita 1.']),
+        ]),
+      ]),
+      paso('🗺 Tu zona de acción', [
+        muestraRadio,
+        el('p', { text: 'Empieza siendo un cuadrado de 7 x 7 (radio 3). Al ampliarla crecen los brazos hacia arriba, abajo y los lados, no las esquinas. En el dibujo, radio 5.' }),
+      ]),
+      paso('✖ Eliminación', [
+        muestraEliminado,
+        el('p', { text: 'Un país con 0 vidas queda eliminado: su bandera se apaga, aparece una ✖ roja y su casilla sigue ocupada.' }),
+      ]),
+    ]);
+  }
+
+  return { abrir, cerrar, crearTutorial };
 })();

@@ -41,6 +41,12 @@ test('partidas: se crea una partida con el país elegido y se puede consultar', 
   assert.strictEqual((await logica.consultar(EMAIL)).tuPais, 'it');
 });
 
+test('partidas: error al actuar durante los 20 s de espera', async () => {
+  await logica.nuevaPartida(EMAIL, 'it');
+  for (let i = 0; i < 5; i++) { ahora += 2_500; await logica.consultar(EMAIL); }
+  await assert.rejects(() => logica.actuar(EMAIL, { tipo: 'expandir' }), { codigo: 'FUERA_DE_TURNO' });
+});
+
 test('partidas: la vista no expone la memoria interna de las IAs', async () => {
   const vista = await logica.nuevaPartida(EMAIL, 'it');
   for (const j of vista.jugadores) {
@@ -61,8 +67,9 @@ test('partidas: el reloj avanza con el tiempo real entre consultas', async () =>
     await logica.consultar(EMAIL);
   }
   const vista = await logica.consultar(EMAIL);
-  assert.strictEqual(vista.ronda, 2);
-  assert.strictEqual(vista.msRestantesRonda, 7_500);
+  assert.strictEqual(vista.ronda, 1);
+  assert.strictEqual(vista.fase, 'espera');
+  assert.strictEqual(vista.msHastaRecarga, 17_500);
 });
 
 test('partidas: si nadie consulta durante mucho tiempo, solo avanza como mucho 3 s (pausa implícita)', async () => {
@@ -70,7 +77,7 @@ test('partidas: si nadie consulta durante mucho tiempo, solo avanza como mucho 3
   ahora += 60 * 60 * 1000; // una hora sin consultar
   const vista = await logica.consultar(EMAIL);
   assert.strictEqual(vista.ronda, 1);
-  assert.strictEqual(vista.msRestantesRonda, 10_000 - MAX_AVANCE_MS);
+  assert.strictEqual(vista.msRestantesTurno, 10_000 - MAX_AVANCE_MS);
 });
 
 test('partidas: el jugador actúa y se guarda el resultado', async () => {
@@ -95,21 +102,21 @@ test('partidas: «Guardar» pausa la partida; en pausa no avanza ni se puede act
   const guardada = await logica.guardar(EMAIL);
   assert.strictEqual(guardada.pausada, true);
   assert.ok(guardada.guardadaEn instanceof Date);
-  const tiempo = guardada.msRestantesRonda;
+  const tiempo = guardada.msRestantesTurno;
 
   ahora += 2000;
-  assert.strictEqual((await logica.consultar(EMAIL)).msRestantesRonda, tiempo);
+  assert.strictEqual((await logica.consultar(EMAIL)).msRestantesTurno, tiempo);
   await assert.rejects(() => logica.actuar(EMAIL, { tipo: 'expandir' }), { codigo: 'PARTIDA_PAUSADA' });
 
   ahora += 2000;
   await logica.reanudar(EMAIL);
   ahora += 1000;
-  assert.strictEqual((await logica.consultar(EMAIL)).msRestantesRonda, tiempo - 1000);
+  assert.strictEqual((await logica.consultar(EMAIL)).msRestantesTurno, tiempo - 1000);
 });
 
 test('partidas: autoguardado al final de cada ronda', async () => {
   await logica.nuevaPartida(EMAIL, 'it');
-  for (let i = 0; i < 4; i++) { ahora += 2_600; await logica.consultar(EMAIL); }
+  for (let i = 0; i < 11; i++) { ahora += 2_800; await logica.consultar(EMAIL); }
   const vista = await logica.consultar(EMAIL);
   assert.strictEqual(vista.ronda, 2);
   assert.strictEqual(vista.autoguardadoRonda, 2);
