@@ -113,6 +113,8 @@ async function rutasPartida(req, res, pathname) {
       responder(201, await logicaPartidas.nuevaPartida(usuario.email, pais));
     } else if (pathname === '/api/partida/accion' && req.method === 'POST') {
       responder(200, await logicaPartidas.actuar(usuario.email, await leerJSON(req)));
+    } else if (pathname === '/api/partida/reiniciar' && req.method === 'POST') {
+      responder(201, await logicaPartidas.reiniciar(usuario.email));
     } else if (pathname === '/api/partida/guardar' && req.method === 'POST') {
       responder(200, await logicaPartidas.guardar(usuario.email));
     } else if (pathname === '/api/partida/reanudar' && req.method === 'POST') {

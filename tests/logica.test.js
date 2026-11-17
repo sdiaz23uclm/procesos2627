@@ -360,3 +360,32 @@ test('30. Una cuenta eliminada no se reactiva con Google: se crea una cuenta nue
   assert.strictEqual(u.estado, 'oauth');
   assert.strictEqual(daoMock.usuarios.filter(x => x.email === 'g@test.com').length, 2);
 });
+
+test('31. Una cuenta creada antes de configurar ADMIN_EMAIL se promociona a admin al iniciar sesión', async () => {
+  const anterior = process.env.ADMIN_EMAIL;
+  delete process.env.ADMIN_EMAIL;
+  try {
+    await crearConfirmado('jefa@test.com', 'Password123*');
+    assert.strictEqual((await daoMock.obtenerPorEmail('jefa@test.com')).rol, 'usuario');
+
+    process.env.ADMIN_EMAIL = 'jefa@test.com';
+    const u = await logica.loginUsuario('jefa@test.com', 'Password123*');
+    assert.strictEqual(u.rol, 'admin');
+    assert.strictEqual((await daoMock.obtenerPorEmail('jefa@test.com')).rol, 'admin');
+    await logica.listarUsuarios(u); // ya puede administrar
+  } finally {
+    if (anterior === undefined) delete process.env.ADMIN_EMAIL; else process.env.ADMIN_EMAIL = anterior;
+  }
+});
+
+test('32. Iniciar sesión no da rol admin a quien no coincide con ADMIN_EMAIL', async () => {
+  const anterior = process.env.ADMIN_EMAIL;
+  process.env.ADMIN_EMAIL = 'otra@test.com';
+  try {
+    await crearConfirmado('normal@test.com', 'Password123*');
+    const u = await logica.loginUsuario('normal@test.com', 'Password123*');
+    assert.strictEqual(u.rol, 'usuario');
+  } finally {
+    if (anterior === undefined) delete process.env.ADMIN_EMAIL; else process.env.ADMIN_EMAIL = anterior;
+  }
+});

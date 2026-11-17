@@ -6,6 +6,8 @@
 .juego button:disabled { opacity: .4; cursor: not-allowed; }
 .juego .btn-sec { background: #e2e8f0; color: var(--text-color); }
 .juego .btn-sec:hover { background: #cbd5e1; }
+.juego .btn-aviso { background: #f59e0b; }
+.juego .btn-aviso:hover { background: #d97706; }
 
 .juego-cabecera {
     display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;

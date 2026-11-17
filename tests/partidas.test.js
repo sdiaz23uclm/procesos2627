@@ -139,3 +139,20 @@ test('partidas: una partida nueva sustituye a la anterior', async () => {
 test('partidas: error al crear una partida con un país inválido', async () => {
   await assert.rejects(() => logica.nuevaPartida(EMAIL, 'zz'), { codigo: 'PAIS_INVALIDO' });
 });
+
+test('partidas: reiniciar empieza una partida nueva con el mismo país', async () => {
+  await logica.nuevaPartida(EMAIL, 'it');
+  await logica.actuar(EMAIL, { tipo: 'expandir' });
+  ahora += 2000;
+  await logica.consultar(EMAIL);
+  const vista = await logica.reiniciar(EMAIL);
+  assert.strictEqual(vista.tuPais, 'it');
+  assert.strictEqual(vista.ronda, 1);
+  assert.strictEqual(vista.msRestantesTurno, 10_000);
+  const yo = vista.jugadores.find(j => j.id === 'it');
+  assert.deepStrictEqual([yo.radio, yo.puntos, yo.vidas], [3, 2, 3]);
+});
+
+test('partidas: error al reiniciar sin partida', async () => {
+  await assert.rejects(() => logica.reiniciar(EMAIL), { codigo: 'PARTIDA_NO_ENCONTRADA' });
+});

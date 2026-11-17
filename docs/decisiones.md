@@ -33,7 +33,7 @@ timestamp: 2026-10-28
 
 - **Qué se decidió:** asignar `admin` al registrarse con el email normalizado coincidente con `ADMIN_EMAIL`.
 - **Por qué:** TODO(alumno): ¿por qué se eligió asignar el rol mediante `ADMIN_EMAIL` en el registro?
-- **Estado:** vigente.
+- **Estado:** vigente. Ampliada el 2026-11-17: además de al registrarse, al iniciar sesión (local o con Google) se promociona a `admin` la cuenta cuyo email coincide con `ADMIN_EMAIL`, para cuentas creadas antes de configurar la variable.
 
 ## D-06 — Sesiones almacenadas en memoria
 

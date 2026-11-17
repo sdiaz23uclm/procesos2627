@@ -93,6 +93,10 @@ const RestClient = {
     return await this._pedirJSON('/api/partida/accion', accion, 'No se pudo realizar la acción');
   },
 
+  async reiniciarPartida() {
+    return await this._pedirJSON('/api/partida/reiniciar', {}, 'No se pudo reiniciar la partida');
+  },
+
   async guardarPartida() {
     return await this._pedirJSON('/api/partida/guardar', {}, 'No se pudo guardar la partida');
   },

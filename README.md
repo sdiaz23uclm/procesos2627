@@ -85,7 +85,7 @@ En Cloud Run, las variables secretas se guardan en **Secret Manager** y se refer
 
 ## Acceso como administrador
 
-La cuenta que se registre (o entre con Google) con el email configurado en `ADMIN_EMAIL` obtiene el rol `admin`. Si se registra con contraseña, debe confirmar el correo antes de entrar. El administrador puede listar usuarios, comprobar si un usuario está activo y eliminar cualquier cuenta.
+La cuenta con el email configurado en `ADMIN_EMAIL` obtiene el rol `admin` al registrarse o, si ya existía, la próxima vez que inicie sesión (local o con Google). Si se registra con contraseña, debe confirmar el correo antes de entrar. En su panel aparece «Administración · Usuarios»: la lista de usuarios (email, rol, estado y si está activo) con un botón «Eliminar» en cada uno, y un buscador para comprobar si un usuario está activo.
 
 Las credenciales de prueba del administrador se envían junto con la entrega, no se publican aquí.
 
@@ -107,7 +107,7 @@ Desde el panel, «Jugar a Alianzas». Eliges tu país y juegas contra 3 IAs (agr
 - La zona de acción (en azul) empieza siendo un cuadrado de 7 x 7; al ampliarla solo crecen los brazos hacia arriba, abajo y los lados.
 - Haz click en una casilla contigua para moverte o en un país dentro de tu zona para atacarle o darle un punto.
 - Un país sin vidas queda en el mapa con la bandera apagada y una ✖ roja. Gana el último en pie.
-- La partida se guarda en MongoDB en cada ronda; «Guardar y pausar» la deja en pausa. Si cierras la página, la partida se detiene sola y la continúas al volver.
+- La partida se guarda en MongoDB en cada ronda; «Guardar y pausar» la deja en pausa y «Reiniciar» empieza de cero con el mismo país. Si cierras la página, la partida se detiene sola y la continúas al volver.
 - El panel y la parte inferior del tablero incluyen un tutorial con las reglas y los contadores.
 
 Toda la lógica se ejecuta en el servidor (el navegador solo dibuja y consulta cada 500 ms). Decisiones D-14 a D-23 en [`docs/decisiones.md`](docs/decisiones.md).

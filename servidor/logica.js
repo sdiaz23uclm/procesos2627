@@ -185,6 +185,7 @@ export class LogicaUsuarios {
       throw new Error("Credenciales inválidas");
     }
 
+    await this.asegurarRolAdmin(usuario);
     console.log(`[LOG] Login exitoso: ${emailNormalizado}`);
     return usuario;
   }
@@ -218,6 +219,7 @@ export class LogicaUsuarios {
       console.log(`[LOG] Cuenta local vinculada con OAuth y confirmada: ${emailNormalizado}`);
     }
 
+    await this.asegurarRolAdmin(existente);
     console.log(`[LOG] Login OAuth exitoso: ${emailNormalizado}`);
     return existente;
   }
@@ -272,6 +274,15 @@ export class LogicaUsuarios {
     }
     console.log(`[LOG] Usuario eliminado: ${emailTargetNormalizado} (por acción de ${solicitanteNormalizado})`);
     return true;
+  }
+
+  // Si la cuenta ya existía antes de configurar ADMIN_EMAIL, se promociona al iniciar sesión (D-05)
+  async asegurarRolAdmin(usuario) {
+    if (usuario.rol !== 'admin' && rolPara(usuario.email) === 'admin') {
+      await this.dao.actualizar(usuario.email, { rol: 'admin' });
+      usuario.rol = 'admin';
+      console.log(`[LOG] ${usuario.email} promocionado a administrador (coincide con ADMIN_EMAIL)`);
+    }
   }
 
   exigirAdmin(usuarioActual, accion) {

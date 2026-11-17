@@ -89,6 +89,23 @@
         .btn-jugar { background: linear-gradient(90deg, #16a34a, #22c55e); font-size: 1.1rem; padding: 14px; }
         .btn-jugar:hover { background: linear-gradient(90deg, #15803d, #16a34a); }
         .titulo-tutorial { margin: 26px 0 0; font-size: 1.05rem; }
+        .admin-panel { border: 1px solid #c7d2fe; background: #eef2ff; border-radius: 10px; padding: 14px 16px; margin-bottom: 20px; }
+        .admin-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .admin-cabecera h3 { margin: 0; font-size: 1.05rem; }
+        .btn-pequeno { width: auto; margin: 0; padding: 7px 12px; font-size: 0.85rem; background: #0284c7; }
+        .btn-pequeno:hover { background: #0369a1; }
+        .tabla-usuarios { overflow-x: auto; }
+        .tabla-usuarios table { background: #fff; margin-top: 10px; }
+        .tabla-usuarios td:last-child { width: 1%; white-space: nowrap; }
+        .tabla-usuarios tr.fila-eliminada td { color: var(--text-muted); text-decoration: line-through; }
+        .tabla-usuarios td:last-child, .tabla-usuarios tr.fila-eliminada td:last-child { text-decoration: none; }
+        .etiqueta { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+        .etiqueta.si { background: #dcfce7; color: #166534; }
+        .etiqueta.no { background: #f1f5f9; color: #475569; }
+        .activo-form { display: flex; gap: 8px; margin-top: 14px; }
+        .activo-form input { flex: 1; }
+        .tutorial-plegable { margin-top: 18px; }
+        .tutorial-plegable summary { cursor: pointer; font-weight: 600; color: var(--primary); }
 
         .container.medio { max-width: 640px; }
         .vista { display: none; }
@@ -267,26 +284,27 @@
                 <p><strong>Rol:</strong> <span id="user-role" style="text-transform: uppercase; font-weight: bold; color: var(--primary);"></span></p>
             </div>
 
-            <button id="play-btn" class="btn-jugar">▶ Jugar a Alianzas</button>
-            <h3 class="titulo-tutorial">Cómo se juega</h3>
-            <div id="tutorial-panel"></div>
-
             <!-- Sección exclusiva para administradores (el servidor también lo comprueba) -->
-            <div id="admin-section" style="display: none; margin-top: 20px;">
-                <h3>Panel de Administración</h3>
-                <button id="load-users-btn" style="background-color: #0284c7;">Listar Usuarios del Sistema</button>
-                <div id="users-container" style="overflow-x: auto;"></div>
+            <div id="admin-section" class="admin-panel" style="display: none;">
+                <div class="admin-cabecera">
+                    <h3>🛡 Administración · Usuarios</h3>
+                    <button id="load-users-btn" class="btn-pequeno">↻ Actualizar</button>
+                </div>
+                <p id="admin-msg"></p>
+                <div id="users-container" class="tabla-usuarios"></div>
 
-                <form id="activo-form" style="margin-top: 20px;">
-                    <div class="form-group">
-                        <label for="activo-email">Comprobar si un usuario está activo</label>
-                        <input type="email" id="activo-email" required placeholder="usuario@email.com">
-                    </div>
-                    <button type="submit" style="background-color: #0284c7;">Comprobar</button>
+                <form id="activo-form" class="activo-form">
+                    <input type="email" id="activo-email" required placeholder="Comprobar si está activo: usuario@email.com" aria-label="Email del usuario a comprobar">
+                    <button type="submit" class="btn-pequeno">Comprobar</button>
                 </form>
                 <p id="activo-resultado"></p>
-                <p id="admin-msg"></p>
             </div>
+
+            <button id="play-btn" class="btn-jugar">▶ Jugar a Alianzas</button>
+            <details class="tutorial-plegable" open>
+                <summary>Cómo se juega</summary>
+                <div id="tutorial-panel"></div>
+            </details>
 
             <button id="logout-btn" style="margin-top: 20px;">Cerrar Sesión</button>
             <button id="delete-self-btn" class="btn-danger">Eliminar mi cuenta</button>
@@ -314,6 +332,12 @@
             vista.classList.add('activa');
             contenedor.classList.toggle('ancho', vista === gameView);
             contenedor.classList.toggle('medio', vista === dashboardView);
+        }
+
+        // Muestra el panel de administración y carga la lista de usuarios (el servidor vuelve a comprobar el rol)
+        function activarAdmin(rol) {
+            adminSection.style.display = rol === 'admin' ? 'block' : 'none';
+            if (rol === 'admin') cargarUsuarios();
         }
 
         // Pestañas «Iniciar sesión» / «Crear cuenta»
@@ -352,9 +376,7 @@
                 if (usuario) {
                     userEmailSpan.textContent = usuario.email;
                     userRoleSpan.textContent = usuario.rol;
-                    if (usuario.rol === 'admin') {
-                        adminSection.style.display = 'block';
-                    }
+                    activarAdmin(usuario.rol);
                     mostrarVista(dashboardView);
                 } else {
                     mostrarVista(authView);
@@ -419,9 +441,7 @@
                 const res = await RestClient.login(email, password);
                 userEmailSpan.textContent = res.email;
                 userRoleSpan.textContent = res.rol;
-                if (res.rol === 'admin') {
-                    adminSection.style.display = 'block';
-                }
+                activarAdmin(res.rol);
                 mostrarVista(dashboardView);
             } catch (err) {
                 document.getElementById('login-error').textContent = err.message;
@@ -472,11 +492,18 @@
                 const cuerpo = document.createElement('tbody');
                 usuarios.forEach(u => {
                     const fila = document.createElement('tr');
-                    [u.email, u.rol, u.estado, u.activo ? 'Sí' : 'No'].forEach(valor => {
+                    if (u.estado === 'eliminado') fila.className = 'fila-eliminada';
+                    [u.email, u.rol, u.estado].forEach(valor => {
                         const celda = document.createElement('td');
                         celda.textContent = valor;
                         fila.appendChild(celda);
                     });
+                    const celdaActivo = document.createElement('td');
+                    const etiqueta = document.createElement('span');
+                    etiqueta.className = `etiqueta ${u.activo ? 'si' : 'no'}`;
+                    etiqueta.textContent = u.activo ? 'Sí' : 'No';
+                    celdaActivo.appendChild(etiqueta);
+                    fila.appendChild(celdaActivo);
                     const celdaAccion = document.createElement('td');
                     if (u.estado !== 'eliminado' && u.email !== userEmailSpan.textContent) {
                         const boton = document.createElement('button');
@@ -491,6 +518,8 @@
                     cuerpo.appendChild(fila);
                 });
                 tabla.appendChild(cuerpo);
+                const vigentes = usuarios.filter(u => u.estado !== 'eliminado').length;
+                mostrarMensaje('admin-msg', `${vigentes} usuarios (${usuarios.length - vigentes} eliminados).`, true);
                 contenedor.replaceChildren(tabla);
             } catch (err) {
                 if (!sesionPerdida(err)) mostrarMensaje('admin-msg', err.message, false);

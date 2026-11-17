@@ -49,6 +49,7 @@ timestamp: 2026-11-17
 | `GET` | `/api/partida` | Usuario con sesión; devuelve su partida tras avanzar el reloj o `404` si no tiene. |
 | `POST` | `/api/partida` | Usuario con sesión; crea una partida con el país `{ pais }`. |
 | `POST` | `/api/partida/accion` | Usuario con sesión; `{ tipo: 'atacar'|'regalar', objetivo }`, `{ tipo: 'mover', x, y }` o `{ tipo: 'expandir' }`. Error `400` si las reglas no lo permiten (p. ej. `FUERA_DE_TURNO` durante la espera), `409` si está en pausa o terminada. |
+| `POST` | `/api/partida/reiniciar` | Usuario con sesión; partida nueva con el mismo país. |
 | `POST` | `/api/partida/guardar` | Usuario con sesión; guarda y pausa. |
 | `POST` | `/api/partida/reanudar` | Usuario con sesión. |
 | `POST` | `/api/logout` | Cualquiera; invalida la sesión si recibe su cookie. |
