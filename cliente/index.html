@@ -20,7 +20,9 @@
 
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background-color: var(--bg-color);
+            background: radial-gradient(circle at 20% 0%, #e0e7ff 0, transparent 45%),
+                        radial-gradient(circle at 90% 10%, #dcfce7 0, transparent 40%),
+                        var(--bg-color);
             color: var(--text-color);
             margin: 0;
             padding: 40px 20px;
@@ -36,9 +38,13 @@
         }
 
         h1 {
-            font-size: 2.25rem;
-            color: var(--primary);
+            font-size: 2.6rem;
             margin-bottom: 5px;
+            background: linear-gradient(90deg, #4f46e5, #16a34a);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.5px;
         }
 
         p.subtitle {
@@ -56,6 +62,35 @@
             box-sizing: border-box;
         }
 
+        .container { transition: max-width .2s; border: 1px solid var(--border-color); }
+
+        /* Pestañas de acceso */
+        .pestanas { display: flex; background: #f1f5f9; border-radius: 10px; padding: 4px; margin-bottom: 22px; }
+        .pestanas .pestana {
+            flex: 1; margin: 0; background: transparent; color: var(--text-muted); border-radius: 8px;
+            padding: 10px; font-weight: 600; transition: background .15s, color .15s, box-shadow .15s;
+        }
+        .pestanas .pestana:hover { background: #e2e8f0; color: var(--text-color); }
+        .pestanas .pestana.activa { background: #fff; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+        .panel { display: none; animation: aparecer .2s ease; }
+        .panel.activo { display: block; }
+        @keyframes aparecer { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+        .cambio-pestana { text-align: center; font-size: 0.875rem; color: var(--text-muted); margin: 14px 0 0; }
+        .cambio-pestana a { color: var(--primary); font-weight: 600; text-decoration: none; }
+        .separador { display: flex; align-items: center; gap: 12px; color: var(--text-muted); font-size: 0.8rem; margin: 20px 0 6px; }
+        .separador::before, .separador::after { content: ''; flex: 1; height: 1px; background: var(--border-color); }
+        .btn-google {
+            background-color: #ffffff; color: var(--text-color); border: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .btn-google:hover { background-color: #f8fafc; }
+        .btn-secundario { background: #e0f2fe; color: #0369a1; }
+        .btn-secundario:hover { background: #bae6fd; }
+        .btn-jugar { background: linear-gradient(90deg, #16a34a, #22c55e); font-size: 1.1rem; padding: 14px; }
+        .btn-jugar:hover { background: linear-gradient(90deg, #15803d, #16a34a); }
+        .titulo-tutorial { margin: 26px 0 0; font-size: 1.05rem; }
+
+        .container.medio { max-width: 640px; }
         .vista { display: none; }
         .activa { display: block; }
 
@@ -88,6 +123,8 @@
             transition: border-color 0.2s;
         }
 
+        input { background: #f8fafc; }
+        input:focus { background: #fff; }
         input:focus {
             outline: none;
             border-color: var(--primary);
@@ -122,17 +159,6 @@
         .aviso { padding: 10px 12px; border-radius: 6px; font-size: 0.9rem; }
         .aviso.ok { background: #dcfce7; color: #166534; }
         .aviso.ko { background: #fee2e2; color: #991b1b; }
-
-        .btn-google {
-            background-color: #ffffff;
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-        .btn-google:hover { background-color: #f1f5f9; }
 
         .error { color: var(--error-color); font-size: 0.875rem; margin-top: 8px; }
         .success { color: var(--success-color); font-size: 0.875rem; margin-top: 8px; }
@@ -180,42 +206,54 @@
         <!-- VISTA DE LOGIN Y REGISTRO -->
         <div id="auth-view" class="vista activa">
             <p id="confirmacion-msg" style="display: none;"></p>
-            <h2>Iniciar Sesión</h2>
-            <form id="login-form">
-                <div class="form-group">
-                    <label for="login-email">Correo Electrónico</label>
-                    <input type="email" id="login-email" required placeholder="tu@email.com">
-                </div>
-                <div class="form-group">
-                    <label for="login-password">Contraseña</label>
-                    <input type="password" id="login-password" required placeholder="••••••••">
-                </div>
-                <button type="submit">Entrar a la plataforma</button>
-            </form>
+
+            <div class="pestanas" role="tablist">
+                <button type="button" class="pestana activa" id="tab-login" role="tab" aria-selected="true" data-panel="panel-login">Iniciar sesión</button>
+                <button type="button" class="pestana" id="tab-registro" role="tab" aria-selected="false" data-panel="panel-registro">Crear cuenta</button>
+            </div>
+
+            <!-- Pestaña: iniciar sesión -->
+            <div id="panel-login" class="panel activo" role="tabpanel">
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="login-email">Correo electrónico</label>
+                        <input type="email" id="login-email" required placeholder="tu@email.com" autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Contraseña</label>
+                        <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password">
+                    </div>
+                    <button type="submit">Entrar</button>
+                </form>
+                <p id="login-error" class="error"></p>
+                <button type="button" id="reenviar-btn" class="btn-secundario" style="display: none;">Reenviar correo de confirmación</button>
+                <p id="reenviar-msg" class="success"></p>
+                <p class="cambio-pestana">¿No tienes cuenta? <a href="#" data-ir="tab-registro">Crea una</a></p>
+            </div>
+
+            <!-- Pestaña: crear cuenta -->
+            <div id="panel-registro" class="panel" role="tabpanel">
+                <form id="register-form">
+                    <div class="form-group">
+                        <label for="reg-email">Correo electrónico</label>
+                        <input type="email" id="reg-email" required placeholder="tu@email.com" autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-password">Contraseña</label>
+                        <input type="password" id="reg-password" required placeholder="••••••••" autocomplete="new-password">
+                    </div>
+                    <button type="submit">Crear cuenta</button>
+                </form>
+                <p id="reg-error" class="error"></p>
+                <p id="reg-success" class="success"></p>
+                <p class="cambio-pestana">¿Ya tienes cuenta? <a href="#" data-ir="tab-login">Inicia sesión</a></p>
+            </div>
+
+            <div class="separador"><span>o</span></div>
             <button type="button" id="google-btn" class="btn-google">
                 <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>
-                Entrar con Google
+                Continuar con Google
             </button>
-            <p id="login-error" class="error"></p>
-            <button type="button" id="reenviar-btn" style="display: none; background-color: #0284c7;">Reenviar correo de confirmación</button>
-            <p id="reenviar-msg" class="success"></p>
-
-            <hr class="divider">
-
-            <h2>Crear Cuenta</h2>
-            <form id="register-form">
-                <div class="form-group">
-                    <label for="reg-email">Correo Electrónico</label>
-                    <input type="email" id="reg-email" required placeholder="tu@email.com">
-                </div>
-                <div class="form-group">
-                    <label for="reg-password">Contraseña</label>
-                    <input type="password" id="reg-password" required placeholder="••••••••">
-                </div>
-                <button type="submit">Registrarse</button>
-            </form>
-            <p id="reg-error" class="error"></p>
-            <p id="reg-success" class="success"></p>
         </div>
 
         <!-- VISTA DEL JUEGO (la dibuja juego.js) -->
@@ -229,7 +267,9 @@
                 <p><strong>Rol:</strong> <span id="user-role" style="text-transform: uppercase; font-weight: bold; color: var(--primary);"></span></p>
             </div>
 
-            <button id="play-btn" style="background-color: #16a34a;">Jugar a Alianzas</button>
+            <button id="play-btn" class="btn-jugar">▶ Jugar a Alianzas</button>
+            <h3 class="titulo-tutorial">Cómo se juega</h3>
+            <div id="tutorial-panel"></div>
 
             <!-- Sección exclusiva para administradores (el servidor también lo comprueba) -->
             <div id="admin-section" style="display: none; margin-top: 20px;">
@@ -273,7 +313,26 @@
             gameView.classList.remove('activa');
             vista.classList.add('activa');
             contenedor.classList.toggle('ancho', vista === gameView);
+            contenedor.classList.toggle('medio', vista === dashboardView);
         }
+
+        // Pestañas «Iniciar sesión» / «Crear cuenta»
+        function activarPestana(idPestana) {
+            document.querySelectorAll('.pestana').forEach(p => {
+                const activa = p.id === idPestana;
+                p.classList.toggle('activa', activa);
+                p.setAttribute('aria-selected', activa);
+                document.getElementById(p.dataset.panel).classList.toggle('activo', activa);
+            });
+        }
+        document.querySelectorAll('.pestana').forEach(p => p.addEventListener('click', () => activarPestana(p.id)));
+        document.querySelectorAll('[data-ir]').forEach(a => a.addEventListener('click', e => {
+            e.preventDefault();
+            activarPestana(a.dataset.ir);
+        }));
+
+        // Tutorial del panel (lo genera juego.js, el mismo que aparece bajo el tablero)
+        document.getElementById('tutorial-panel').appendChild(Juego.crearTutorial());
 
         function abrirJuego() {
             mostrarVista(gameView);

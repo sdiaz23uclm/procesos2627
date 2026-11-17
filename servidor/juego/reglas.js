@@ -3,13 +3,14 @@
 
 export const CONFIG = Object.freeze({
   TAM: 12,                     // mapa de 12 x 12 (D-16)
-  DURACION_RONDA_MS: 10_000,   // rondas de 10 s (D-14)
-  RONDAS_POR_RECARGA: 3,       // recarga cada 30 s (D-15)
+  DURACION_CICLO_MS: 30_000,   // cada ronda dura 30 s y empieza con una recarga (D-22)
+  DURACION_TURNO_MS: 10_000,   // solo se puede actuar en los primeros 10 s de cada ronda (D-22)
   PUNTOS_INICIALES: 2,
   PUNTOS_RECARGA: 2,
   TOPE_PUNTOS: 6,
   VIDAS: 3,
   RADIO_INICIAL: 3,
+  ANCHO_BRAZOS: 3,             // el radio crece en cruz con brazos de 7 casillas de ancho (D-23)
   COSTE_ACCION: 1,
   MAX_EVENTOS: 30,
 });
@@ -33,9 +34,25 @@ export function errorJuego(codigo, mensaje) {
   return err;
 }
 
-// Radio cuadrado (D-16): cuentan las diagonales
+// Distancia en casillas contando diagonales: se usa para el movimiento (8 direcciones)
 export function distancia(a, b) {
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+}
+
+// Zona de acción en cruz (D-23): cuadrado inicial de 7 x 7 cuyos brazos se alargan al ampliar el radio
+export function enRadio(j, casilla) {
+  const dx = Math.abs(j.x - casilla.x);
+  const dy = Math.abs(j.y - casilla.y);
+  return Math.max(dx, dy) <= j.radio && Math.min(dx, dy) <= CONFIG.ANCHO_BRAZOS;
+}
+
+// ¿Está abierto el turno de 10 s de la ronda actual? (D-22)
+export function turnoAbierto(estado) {
+  return estado.tiempoMs - inicioRonda(estado) < CONFIG.DURACION_TURNO_MS;
+}
+
+function inicioRonda(estado) {
+  return (estado.ronda - 1) * CONFIG.DURACION_CICLO_MS;
 }
 
 export function buscarJugador(estado, id) {
@@ -57,7 +74,7 @@ export function dentroDelMapa(estado, x, y) {
 
 // Países vivos (distintos de j) dentro de su radio de acción
 export function alcanzables(estado, j) {
-  return estado.jugadores.filter(o => o.id !== j.id && o.vivo && distancia(j, o) <= j.radio);
+  return estado.jugadores.filter(o => o.id !== j.id && o.vivo && enRadio(j, o));
 }
 
 function barajar(lista, rng) {
@@ -74,9 +91,9 @@ function registrar(estado, texto) {
   if (estado.eventos.length > CONFIG.MAX_EVENTOS) estado.eventos.shift();
 }
 
-// Momento (en tiempo de juego) en que una IA actuará dentro de la ronda que empieza en inicioRondaMs
+// Momento (en tiempo de juego) en que una IA actuará dentro del turno de la ronda que empieza en inicioRondaMs
 function planificarIA(inicioRondaMs, rng) {
-  return inicioRondaMs + 2000 + Math.floor(rng() * 6000);
+  return inicioRondaMs + 1500 + Math.floor(rng() * 7000);
 }
 
 /**
@@ -105,6 +122,7 @@ export function crearEstado(paisHumano, rng = Math.random) {
     radio: CONFIG.RADIO_INICIAL,
     vivo: true,
     // Memoria para las IAs: quién me ha regalado puntos (pendientes de devolver) y quién me ha atacado
+    actuoEnRonda: false,
     regalosRecibidos: {},   // regalos pendientes de devolver (los usa la IA diplomática)
     aliados: {},            // países que me han regalado puntos alguna vez
     ataquesRecibidos: {},
@@ -115,13 +133,14 @@ export function crearEstado(paisHumano, rng = Math.random) {
     tam: t,
     ronda: 1,
     tiempoMs: 0,
+    turnoCerrado: false,
     estado: 'en_curso',
     resultado: null,
     ganador: null,
     jugadores,
     eventos: [],
   };
-  registrar(estado, `Comienza la partida. Juegas con ${humano.nombre}.`);
+  registrar(estado, `Comienza la partida. Juegas con ${humano.nombre}. ¡Tu primer turno está abierto!`);
   return estado;
 }
 
@@ -139,6 +158,9 @@ export function aplicarAccion(estado, idJugador, accion) {
   }
   if (!accion || typeof accion.tipo !== 'string') {
     throw errorJuego('ACCION_INVALIDA', 'Acción no reconocida.');
+  }
+  if (!turnoAbierto(estado)) {
+    throw errorJuego('FUERA_DE_TURNO', 'Tu turno ha terminado. Espera a la próxima recarga para volver a actuar.');
   }
   if (j.puntos < CONFIG.COSTE_ACCION) {
     throw errorJuego('SIN_PUNTOS', 'No te quedan puntos de acción. Espera a la próxima recarga.');
@@ -198,6 +220,7 @@ export function aplicarAccion(estado, idJugador, accion) {
     default:
       throw errorJuego('ACCION_INVALIDA', 'Acción no reconocida.');
   }
+  j.actuoEnRonda = true;
   return estado;
 }
 
@@ -209,7 +232,7 @@ function objetivoEnAlcance(estado, j, idObjetivo) {
   if (!o.vivo) {
     throw errorJuego('ACCION_INVALIDA', `${o.nombre} ya está eliminado.`);
   }
-  if (distancia(j, o) > j.radio) {
+  if (!enRadio(j, o)) {
     throw errorJuego('FUERA_DE_ALCANCE', `${o.nombre} está fuera de tu radio de acción.`);
   }
   return o;
@@ -231,26 +254,32 @@ export function comprobarFin(estado) {
 }
 
 /**
- * Avanza el reloj de la partida msAvance milisegundos, procesando en orden los finales de ronda,
- * las recargas de puntos y las jugadas de las IAs. decidirIA(estado, jugador, rng) devuelve una acción o null.
+ * Avanza el reloj de la partida msAvance milisegundos procesando en orden: las jugadas de las IAs
+ * (dentro del turno), el cierre del turno a los 10 s y el comienzo de cada ronda con su recarga (D-22).
+ * decidirIA(estado, jugador, rng) devuelve una acción o null.
  */
 export function avanzarTiempo(estado, msAvance, decidirIA, rng = Math.random) {
   if (estado.estado !== 'en_curso' || msAvance <= 0) return estado;
   const objetivo = estado.tiempoMs + msAvance;
 
   while (estado.estado === 'en_curso') {
-    const finRonda = estado.ronda * CONFIG.DURACION_RONDA_MS;
+    const inicio = inicioRonda(estado);
+    const finTurno = inicio + CONFIG.DURACION_TURNO_MS;
+    const finRonda = inicio + CONFIG.DURACION_CICLO_MS;
     const proximaIA = estado.jugadores
       .filter(j => !j.humano && j.vivo && j.proximaAccionMs !== null)
       .sort((a, b) => a.proximaAccionMs - b.proximaAccionMs)[0];
 
-    if (proximaIA && proximaIA.proximaAccionMs < finRonda && proximaIA.proximaAccionMs <= objetivo) {
-      estado.tiempoMs = proximaIA.proximaAccionMs;
+    if (proximaIA && proximaIA.proximaAccionMs < finTurno && proximaIA.proximaAccionMs <= objetivo) {
+      estado.tiempoMs = Math.max(estado.tiempoMs, proximaIA.proximaAccionMs);
       jugarIA(estado, proximaIA, decidirIA, rng);
       proximaIA.proximaAccionMs = planificarIA(finRonda, rng);
+    } else if (!estado.turnoCerrado && finTurno <= objetivo) {
+      estado.tiempoMs = finTurno;
+      cerrarTurno(estado);
     } else if (finRonda <= objetivo) {
       estado.tiempoMs = finRonda;
-      terminarRonda(estado);
+      empezarRonda(estado);
     } else {
       estado.tiempoMs = objetivo;
       break;
@@ -269,22 +298,31 @@ function jugarIA(estado, ia, decidirIA, rng) {
   }
 }
 
-function terminarRonda(estado) {
-  estado.ronda += 1;
-  if ((estado.ronda - 1) % CONFIG.RONDAS_POR_RECARGA === 0) {
-    for (const j of vivos(estado)) {
-      j.puntos = Math.min(CONFIG.TOPE_PUNTOS, j.puntos + CONFIG.PUNTOS_RECARGA);
-    }
-    registrar(estado, `Recarga: todos los países reciben +${CONFIG.PUNTOS_RECARGA} puntos (máximo ${CONFIG.TOPE_PUNTOS}).`);
+function cerrarTurno(estado) {
+  estado.turnoCerrado = true;
+  const humano = estado.jugadores.find(j => j.humano);
+  if (humano.vivo && !humano.actuoEnRonda) {
+    registrar(estado, `${humano.nombre} no actuó a tiempo y pierde este turno.`);
   }
+}
+
+function empezarRonda(estado) {
+  estado.ronda += 1;
+  estado.turnoCerrado = false;
+  for (const j of vivos(estado)) {
+    j.puntos = Math.min(CONFIG.TOPE_PUNTOS, j.puntos + CONFIG.PUNTOS_RECARGA);
+    j.actuoEnRonda = false;
+  }
+  registrar(estado, `Ronda ${estado.ronda}: +${CONFIG.PUNTOS_RECARGA} puntos para todos (máximo ${CONFIG.TOPE_PUNTOS}). Turno abierto 10 s.`);
 }
 
 // Información de tiempo para la interfaz
 export function relojes(estado) {
-  const ronda = CONFIG.DURACION_RONDA_MS;
-  const recarga = ronda * CONFIG.RONDAS_POR_RECARGA;
+  const transcurrido = estado.tiempoMs - inicioRonda(estado);
+  const abierto = transcurrido < CONFIG.DURACION_TURNO_MS;
   return {
-    msRestantesRonda: estado.ronda * ronda - estado.tiempoMs,
-    msHastaRecarga: (Math.floor(estado.tiempoMs / recarga) + 1) * recarga - estado.tiempoMs,
+    fase: abierto ? 'turno' : 'espera',
+    msRestantesTurno: abierto ? CONFIG.DURACION_TURNO_MS - transcurrido : 0,
+    msHastaRecarga: CONFIG.DURACION_CICLO_MS - transcurrido,
   };
 }

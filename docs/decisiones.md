@@ -87,19 +87,19 @@ timestamp: 2026-10-28
 
 - **Qué se decidió:** la partida avanza en rondas de 10 s en las que todos los países (jugador e IAs) actúan a la vez. Cada acción se aplica en el momento en que se elige (gana quien actúa primero); no se resuelven al final de la ronda.
 - **Por qué:** TODO(alumno).
-- **Estado:** vigente.
+- **Estado:** sustituida por D-22.
 
 ## D-15 — Alianzas: puntos de acción
 
 - **Qué se decidió:** cada país empieza con 2 puntos; cada 30 s (3 rondas) recibe +2, con un tope de 6. No gastar puntos equivale a «no hacer nada» y permite acumular hasta el tope.
 - **Por qué:** TODO(alumno).
-- **Estado:** vigente.
+- **Estado:** el ritmo de recarga se mantiene; el momento en que se puede actuar lo fija D-22.
 
 ## D-16 — Alianzas: mapa de 12 x 12 y radio de acción cuadrado
 
 - **Qué se decidió:** mapa en rejilla de 12 x 12 con 4 países que empiezan cerca de las esquinas. El radio de acción se mide en cuadrado (las diagonales cuentan: radio 3 = zona de 7 x 7) y empieza en 3.
 - **Por qué:** TODO(alumno).
-- **Estado:** vigente.
+- **Estado:** vigente el mapa de 12 x 12; la forma del radio la sustituye D-23.
 
 ## D-17 — Alianzas: IAs con personalidad
 
@@ -130,3 +130,15 @@ timestamp: 2026-10-28
 - **Qué se decidió:** el estado de cada partida se guarda en la colección `partidas` (una por usuario) con un número de versión; cada petición carga la partida, la actualiza y la guarda solo si nadie la cambió entretanto (si no, reintenta). «Guardar» deja además la partida en pausa con su fecha.
 - **Por qué:** TODO(alumno). (Contexto: funciona con reinicios y con varias instancias de Cloud Run, igual que las sesiones de D-13).
 - **Estado:** vigente.
+
+## D-22 — Alianzas: ciclos de 30 s con un turno de 10 s para actuar
+
+- **Qué se decidió:** la partida avanza en ciclos (rondas) de 30 s. Al empezar cada ciclo todos los países reciben +2 puntos (tope 6) y se abre un turno de 10 s en el que se puede actuar tantas veces como permitan los puntos; las acciones siguen aplicándose al instante. Durante los 20 s restantes nadie puede actuar. Quien no actúa en su turno lo pierde (sus puntos se conservan para el siguiente).
+- **Por qué:** TODO(alumno).
+- **Estado:** vigente. Sustituye a D-14.
+
+## D-23 — Alianzas: radio en cruz
+
+- **Qué se decidió:** la zona de acción empieza siendo el cuadrado de 7 x 7 alrededor del país (radio 3). Cada ampliación alarga una casilla los cuatro brazos (arriba, abajo, izquierda y derecha) manteniendo su ancho de 7; las esquinas no crecen. Una casilla está al alcance si `max(|dx|, |dy|) <= radio` y `min(|dx|, |dy|) <= 3`. El movimiento sigue siendo de una casilla en 8 direcciones.
+- **Por qué:** con el radio cuadrado, ampliar daba demasiado alcance (desbalanceado). TODO(alumno): completar.
+- **Estado:** vigente. Sustituye a la forma del radio de D-16.

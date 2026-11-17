@@ -1,8 +1,9 @@
 /* Alianzas: estilos de la vista de juego (capa de presentación) */
 
-.container.ancho { max-width: 1040px; }
+.container.ancho { max-width: 1040px !important; }
 
 .juego button { width: auto; margin-top: 0; padding: 8px 14px; font-size: 0.9rem; }
+.juego button:disabled { opacity: .4; cursor: not-allowed; }
 .juego .btn-sec { background: #e2e8f0; color: var(--text-color); }
 .juego .btn-sec:hover { background: #cbd5e1; }
 
@@ -34,6 +35,9 @@
 .temporizador { height: 6px; background: #cbd5e1; border-radius: 3px; overflow: hidden; margin-top: 6px; }
 .temporizador div { height: 100%; background: var(--primary); transition: width .5s linear; }
 .temporizador.urgente div { background: var(--error-color); }
+.temporizador.espera div { background: #94a3b8; }
+.dato-turno { transition: background .3s; }
+.dato-turno.abierto { background: #dcfce7; box-shadow: inset 0 0 0 2px #22c55e; }
 .pips span { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 3px; border: 2px solid var(--primary); }
 .pips span.lleno { background: var(--primary); }
 .corazones { color: #e11d48; letter-spacing: 2px; }
@@ -49,11 +53,15 @@
     user-select: none;
 }
 .celda {
-    width: var(--celda); height: var(--celda); background: #e2e8f0; position: relative;
+    width: var(--celda); height: var(--celda); background: #e5e7eb; position: relative;
     display: flex; align-items: center; justify-content: center; cursor: default;
 }
-.celda.en-radio { background: #dbeafe; cursor: pointer; }
-.celda.contigua:not(.ocupada):hover { background: #93c5fd; }
+/* Zona de acción: azul intenso durante el turno, apagada durante la espera */
+.celda.en-radio { background: #60a5fa; cursor: pointer; box-shadow: inset 0 0 0 1px #3b82f6; }
+.celda.contigua:not(.ocupada) { background: #3b82f6; }
+.celda.contigua:not(.ocupada):hover { background: #1d4ed8; }
+.tablero.en-espera .celda.en-radio { background: #bfdbfe; box-shadow: none; cursor: not-allowed; }
+.tablero.en-espera .celda.contigua:not(.ocupada) { background: #bfdbfe; }
 .celda.en-radio.ocupada:hover { outline: 3px solid var(--primary); outline-offset: -3px; z-index: 1; }
 .celda .bandera { width: 34px; height: 23px; }
 .celda.mio .bandera { outline: 3px solid #f59e0b; outline-offset: 1px; }
@@ -102,3 +110,19 @@
     .celda .bandera { width: 22px; height: 15px; }
     .celda.eliminado::after { font-size: 18px; }
 }
+
+/* --- Tutorial --- */
+.tutorial { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 10px; }
+.tutorial .paso { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px; }
+.tutorial h4 { margin: 0 0 6px; font-size: 0.95rem; }
+.tutorial p, .tutorial li { font-size: 0.83rem; line-height: 1.5; color: #334155; margin: 4px 0; }
+.tutorial ul { padding-left: 18px; margin: 4px 0; }
+.tutorial .pips span { width: 9px; height: 9px; }
+.muestra-radio { display: inline-grid; grid-template-columns: repeat(11, 9px); gap: 1px; margin: 4px 0; }
+.muestra-radio span { width: 9px; height: 9px; background: #e5e7eb; }
+.muestra-radio span.r { background: #60a5fa; }
+.muestra-radio span.p { background: #f59e0b; }
+.muestra-celda { display: inline-flex !important; --celda: 44px; border-radius: 6px; }
+.muestra-celda .bandera { width: 34px; height: 23px; }
+.tutorial-plegable { margin-top: 18px; }
+.tutorial-plegable summary { cursor: pointer; font-weight: 600; color: var(--primary); }

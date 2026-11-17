@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { test, beforeEach } from 'node:test';
-import { CONFIG, crearEstado, aplicarAccion, avanzarTiempo, relojes, distancia, alcanzables } from '../servidor/juego/reglas.js';
+import { CONFIG, crearEstado, aplicarAccion, avanzarTiempo, relojes, distancia, alcanzables, enRadio, turnoAbierto } from '../servidor/juego/reglas.js';
 import { rngConSemilla, colocar, sinIA } from './ayudas.js';
 
 let e;     // estado de la partida
@@ -33,9 +33,27 @@ test('alianzas: error al crear una partida con un país que no existe', () => {
   assert.throws(() => crearEstado('xx'), { codigo: 'PAIS_INVALIDO' });
 });
 
-test('alianzas: el radio es cuadrado (las diagonales cuentan)', () => {
-  assert.strictEqual(distancia({ x: 0, y: 0 }, { x: 3, y: 3 }), 3);
+test('alianzas: el radio empieza como un cuadrado de 7 x 7 (con diagonales)', () => {
+  const centro = { x: 5, y: 5, radio: 3 };
+  assert.ok(enRadio(centro, { x: 8, y: 8 }));
+  assert.ok(!enRadio(centro, { x: 9, y: 5 }));
   assert.deepStrictEqual(alcanzables(e, yo).map(j => j.id).sort(), [rivales[0].id, rivales[1].id].sort());
+});
+
+test('alianzas: al ampliar el radio solo crecen los brazos (arriba, abajo y lados), no las esquinas', () => {
+  const p = { x: 5, y: 5, radio: 5 };
+  assert.ok(enRadio(p, { x: 10, y: 5 }));   // brazo derecho
+  assert.ok(enRadio(p, { x: 5, y: 0 }));    // brazo superior
+  assert.ok(enRadio(p, { x: 10, y: 8 }));   // brazo con 7 de ancho
+  assert.ok(!enRadio(p, { x: 10, y: 9 }));  // esquina: fuera
+  assert.ok(!enRadio(p, { x: 9, y: 9 }));   // diagonal que no crece
+  const casillas = [];
+  for (let x = 0; x < 12; x++) for (let y = 0; y < 12; y++) if (enRadio(p, { x, y })) casillas.push(1);
+  assert.strictEqual(casillas.length, 11 * 11 - 4 * 4); // 11 x 11 sin las 4 esquinas de 2 x 2
+});
+
+test('alianzas: la distancia de movimiento cuenta diagonales', () => {
+  assert.strictEqual(distancia({ x: 0, y: 0 }, { x: 3, y: 3 }), 3);
 });
 
 test('alianzas: atacar quita una vida al objetivo y cuesta un punto', () => {
@@ -90,19 +108,47 @@ test('alianzas: acción desconocida da error', () => {
   assert.throws(() => aplicarAccion(e, 'es', null), { codigo: 'ACCION_INVALIDA' });
 });
 
-test('alianzas: las rondas duran 10 s y cada 30 s se recargan +2 puntos hasta un máximo de 6', () => {
+test('alianzas: cada ronda dura 30 s: 10 s de turno para actuar y 20 s de espera', () => {
+  assert.ok(turnoAbierto(e));
+  assert.deepStrictEqual(relojes(e), { fase: 'turno', msRestantesTurno: 10_000, msHastaRecarga: 30_000 });
   avanzarTiempo(e, 9_999, sinIA);
-  assert.strictEqual(e.ronda, 1);
+  aplicarAccion(e, 'es', { tipo: 'expandir' }); // último milisegundo del turno: vale
   avanzarTiempo(e, 1, sinIA);
-  assert.strictEqual(e.ronda, 2);
-  assert.strictEqual(yo.puntos, 2);
+  assert.ok(!turnoAbierto(e));
+  assert.deepStrictEqual(relojes(e), { fase: 'espera', msRestantesTurno: 0, msHastaRecarga: 20_000 });
+  assert.strictEqual(e.ronda, 1);
+});
 
-  avanzarTiempo(e, 20_000, sinIA); // t = 30 s
-  assert.strictEqual(e.ronda, 4);
+test('alianzas: error al actuar fuera del turno de 10 s', () => {
+  avanzarTiempo(e, 15_000, sinIA);
+  assert.throws(() => aplicarAccion(e, 'es', { tipo: 'expandir' }), { codigo: 'FUERA_DE_TURNO' });
+  assert.strictEqual(yo.puntos, 2);
+});
+
+test('alianzas: en un turno se puede actuar tantas veces como puntos se tengan', () => {
+  yo.puntos = 4;
+  for (let i = 0; i < 4; i++) aplicarAccion(e, 'es', { tipo: 'expandir' });
+  assert.strictEqual(yo.radio, 7);
+  assert.throws(() => aplicarAccion(e, 'es', { tipo: 'expandir' }), { codigo: 'SIN_PUNTOS' });
+});
+
+test('alianzas: cada 30 s empieza una ronda con +2 puntos (máximo 6) y el turno vuelve a abrirse', () => {
+  avanzarTiempo(e, 30_000, sinIA);
+  assert.strictEqual(e.ronda, 2);
   assert.strictEqual(yo.puntos, 4);
-  avanzarTiempo(e, 60_000, sinIA); // t = 90 s: dos recargas más, con tope
+  assert.ok(turnoAbierto(e));
+  avanzarTiempo(e, 60_000, sinIA); // dos rondas más, con tope
+  assert.strictEqual(e.ronda, 4);
   assert.strictEqual(yo.puntos, 6);
-  assert.deepStrictEqual(relojes(e), { msRestantesRonda: 10_000, msHastaRecarga: 30_000 });
+});
+
+test('alianzas: si el jugador no actúa en su turno lo pierde (y se registra)', () => {
+  avanzarTiempo(e, 10_000, sinIA);
+  assert.match(e.eventos.at(-1).texto, /no actuó a tiempo/);
+  avanzarTiempo(e, 20_000, sinIA);
+  aplicarAccion(e, 'es', { tipo: 'expandir' });
+  avanzarTiempo(e, 10_000, sinIA);
+  assert.doesNotMatch(e.eventos.at(-1).texto, /no actuó a tiempo/);
 });
 
 test('alianzas: los eliminados no reciben recarga', () => {
@@ -110,12 +156,14 @@ test('alianzas: los eliminados no reciben recarga', () => {
   rivales[0].puntos = 0;
   avanzarTiempo(e, 30_000, sinIA);
   assert.strictEqual(rivales[0].puntos, 0);
+  assert.strictEqual(yo.puntos, 4);
 });
 
-test('alianzas: cada IA juega una vez por ronda', () => {
-  let jugadas = 0;
-  avanzarTiempo(e, 30_000, () => { jugadas++; return null; }, rngConSemilla(2));
-  assert.strictEqual(jugadas, 3 * 3); // 3 IAs x 3 rondas
+test('alianzas: cada IA juega una vez por ronda y siempre dentro del turno', () => {
+  const momentos = [];
+  avanzarTiempo(e, 90_000, est => { momentos.push(est.tiempoMs % 30_000); return null; }, rngConSemilla(2));
+  assert.strictEqual(momentos.length, 3 * 3); // 3 IAs x 3 rondas
+  assert.ok(momentos.every(t => t < 10_000));
 });
 
 test('alianzas: gana el último país en pie', () => {
