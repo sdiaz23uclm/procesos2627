@@ -69,6 +69,46 @@ const RestClient = {
     }, 'No se pudo eliminar el usuario');
   },
 
+  // --- Alianzas ---
+
+  async listarPaises() {
+    return await this._pedir('/api/paises', {}, 'No se pudo cargar la lista de países');
+  },
+
+  // Devuelve null si el usuario no tiene partida
+  async obtenerPartida() {
+    try {
+      return await this._pedir('/api/partida', {}, 'No se pudo cargar la partida');
+    } catch (err) {
+      if (err.codigo === 'PARTIDA_NO_ENCONTRADA') return null;
+      throw err;
+    }
+  },
+
+  async nuevaPartida(pais) {
+    return await this._pedirJSON('/api/partida', { pais }, 'No se pudo crear la partida');
+  },
+
+  async accionPartida(accion) {
+    return await this._pedirJSON('/api/partida/accion', accion, 'No se pudo realizar la acción');
+  },
+
+  async guardarPartida() {
+    return await this._pedirJSON('/api/partida/guardar', {}, 'No se pudo guardar la partida');
+  },
+
+  async reanudarPartida() {
+    return await this._pedirJSON('/api/partida/reanudar', {}, 'No se pudo reanudar la partida');
+  },
+
+  async _pedirJSON(url, cuerpo, mensajePorDefecto) {
+    return await this._pedir(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo)
+    }, mensajePorDefecto);
+  },
+
   // Petición genérica: devuelve el JSON o lanza un Error con el mensaje del servidor
   async _pedir(url, opciones, mensajePorDefecto) {
     let respuesta;

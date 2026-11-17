@@ -1,0 +1,104 @@
+/* Alianzas: estilos de la vista de juego (capa de presentación) */
+
+.container.ancho { max-width: 1040px; }
+
+.juego button { width: auto; margin-top: 0; padding: 8px 14px; font-size: 0.9rem; }
+.juego .btn-sec { background: #e2e8f0; color: var(--text-color); }
+.juego .btn-sec:hover { background: #cbd5e1; }
+
+.juego-cabecera {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+.juego-cabecera h2 { margin: 0; border: none; padding: 0; }
+.juego-botones { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.juego-msg { min-height: 1.4em; font-size: 0.9rem; margin: 8px 0; }
+.juego-msg.ko { color: var(--error-color); }
+.juego-msg.ok { color: #15803d; }
+
+/* --- Selección de país --- */
+.paises { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+.pais-opcion {
+    display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 8px;
+    border: 2px solid var(--border-color); border-radius: 10px; cursor: pointer; background: #fff;
+    transition: border-color .15s, transform .15s;
+}
+.pais-opcion:hover { border-color: var(--primary); transform: translateY(-2px); }
+.pais-opcion .bandera { width: 60px; height: 40px; }
+
+/* --- Barra de estado --- */
+.juego-estado { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.dato { background: #f1f5f9; border-radius: 8px; padding: 8px 12px; font-size: 0.85rem; }
+.dato strong { display: block; font-size: 1.1rem; margin-top: 2px; }
+.temporizador { height: 6px; background: #cbd5e1; border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.temporizador div { height: 100%; background: var(--primary); transition: width .5s linear; }
+.temporizador.urgente div { background: var(--error-color); }
+.pips span { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 3px; border: 2px solid var(--primary); }
+.pips span.lleno { background: var(--primary); }
+.corazones { color: #e11d48; letter-spacing: 2px; }
+.corazones .vacio { color: #cbd5e1; }
+
+/* --- Tablero --- */
+.juego-cuerpo { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+.tablero-envoltorio { position: relative; }
+.tablero {
+    display: grid; gap: 2px; background: #94a3b8; padding: 2px; border-radius: 6px;
+    grid-template-columns: repeat(var(--tam), var(--celda));
+    --celda: 44px;
+    user-select: none;
+}
+.celda {
+    width: var(--celda); height: var(--celda); background: #e2e8f0; position: relative;
+    display: flex; align-items: center; justify-content: center; cursor: default;
+}
+.celda.en-radio { background: #dbeafe; cursor: pointer; }
+.celda.contigua:not(.ocupada):hover { background: #93c5fd; }
+.celda.en-radio.ocupada:hover { outline: 3px solid var(--primary); outline-offset: -3px; z-index: 1; }
+.celda .bandera { width: 34px; height: 23px; }
+.celda.mio .bandera { outline: 3px solid #f59e0b; outline-offset: 1px; }
+.celda .vidas-mini { position: absolute; bottom: 1px; font-size: 8px; color: #e11d48; line-height: 1; }
+
+.bandera { border-radius: 3px; box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+.eliminado .bandera { filter: grayscale(1) brightness(.75); }
+.celda.eliminado::after {
+    content: '✖'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #dc2626; font-size: 30px; font-weight: 900; text-shadow: 0 0 2px #fff;
+}
+
+/* Menú de atacar / dar punto */
+.menu-accion {
+    position: absolute; z-index: 10; background: #fff; border-radius: 8px; padding: 8px;
+    box-shadow: 0 8px 20px rgba(0,0,0,.2); display: flex; flex-direction: column; gap: 6px; min-width: 150px;
+}
+.menu-accion p { margin: 0 0 4px; font-weight: 600; font-size: 0.9rem; }
+
+/* Pausa y final */
+.capa {
+    position: absolute; inset: 0; background: rgba(15, 23, 42, .72); border-radius: 6px; z-index: 20;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    color: #fff; text-align: center; padding: 20px;
+}
+.capa h3 { margin: 0; font-size: 1.8rem; }
+
+/* --- Panel lateral --- */
+.juego-lateral { flex: 1; min-width: 240px; }
+.juego-lateral h3 { font-size: 1rem; margin: 0 0 8px; }
+.lista-paises { list-style: none; padding: 0; margin: 0 0 16px; }
+.lista-paises li {
+    display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; font-size: 0.85rem;
+}
+.lista-paises li.mio { background: #fef3c7; }
+.lista-paises li.eliminado { opacity: .55; text-decoration: line-through; }
+.lista-paises .bandera { width: 30px; height: 20px; flex-shrink: 0; }
+.lista-paises .detalle { color: var(--text-muted); font-size: 0.78rem; }
+.eventos { list-style: none; padding: 0; margin: 0; max-height: 230px; overflow-y: auto; font-size: 0.8rem; }
+.eventos li { padding: 4px 0; border-bottom: 1px solid var(--border-color); }
+.eventos .r { color: var(--text-muted); margin-right: 6px; }
+.ayuda { font-size: 0.78rem; color: var(--text-muted); margin-top: 12px; line-height: 1.5; }
+
+@media (max-width: 640px) {
+    .tablero { --celda: 26px; }
+    .celda .bandera { width: 22px; height: 15px; }
+    .celda.eliminado::after { font-size: 18px; }
+}

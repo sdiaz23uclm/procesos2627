@@ -82,3 +82,51 @@ timestamp: 2026-10-28
 - **Qué se decidió:** guardar las sesiones en la colección `sesiones` de MongoDB (hash del identificador, email y caducidad de 7 días con índice TTL) en lugar del `Map` en memoria.
 - **Por qué:** TODO(alumno): (pista: reinicios y varias instancias en Cloud Run).
 - **Estado:** vigente. Sustituye a D-06.
+
+## D-14 — Alianzas: rondas simultáneas de 10 segundos con acciones instantáneas
+
+- **Qué se decidió:** la partida avanza en rondas de 10 s en las que todos los países (jugador e IAs) actúan a la vez. Cada acción se aplica en el momento en que se elige (gana quien actúa primero); no se resuelven al final de la ronda.
+- **Por qué:** TODO(alumno).
+- **Estado:** vigente.
+
+## D-15 — Alianzas: puntos de acción
+
+- **Qué se decidió:** cada país empieza con 2 puntos; cada 30 s (3 rondas) recibe +2, con un tope de 6. No gastar puntos equivale a «no hacer nada» y permite acumular hasta el tope.
+- **Por qué:** TODO(alumno).
+- **Estado:** vigente.
+
+## D-16 — Alianzas: mapa de 12 x 12 y radio de acción cuadrado
+
+- **Qué se decidió:** mapa en rejilla de 12 x 12 con 4 países que empiezan cerca de las esquinas. El radio de acción se mide en cuadrado (las diagonales cuentan: radio 3 = zona de 7 x 7) y empieza en 3.
+- **Por qué:** TODO(alumno).
+- **Estado:** vigente.
+
+## D-17 — Alianzas: IAs con personalidad
+
+- **Qué se decidió:** las 3 IAs tienen personalidades distintas: agresiva (ataca al más débil a su alcance), diplomática (devuelve los puntos que le regalan y evita atacar a sus aliados) y equilibrada.
+- **Por qué:** TODO(alumno).
+- **Estado:** vigente.
+
+## D-18 — Alianzas: el jugador elige su país
+
+- **Qué se decidió:** el jugador elige su país de una lista de 8 y las IAs toman otros 3 al azar.
+- **Por qué:** TODO(alumno).
+- **Estado:** vigente.
+
+## D-19 — Alianzas: guardado automático y manual en MongoDB
+
+- **Qué se decidió:** la partida se guarda en MongoDB al final de cada ronda y también con un botón «Guardar». Al iniciar sesión se puede continuar la partida guardada.
+- **Por qué:** TODO(alumno).
+- **Estado:** vigente.
+
+## D-20 — Alianzas: el servidor manda y el tiempo avanza bajo demanda
+
+- **Qué se decidió:** toda la lógica del juego (rondas, recargas, IAs, validación de acciones) se ejecuta en el servidor. No hay temporizadores en el servidor: el navegador consulta el estado cada 500 ms y, en cada petición, el servidor avanza el reloj de la partida el tiempo real transcurrido (como mucho 3 s por petición) y procesa lo que haya ocurrido. Si nadie consulta, la partida queda en pausa.
+- **Por qué:** TODO(alumno). (Contexto: Cloud Run solo asigna CPU mientras atiende peticiones, y la especificación prohíbe la lógica de negocio en el cliente).
+- **Estado:** vigente.
+
+## D-21 — Alianzas: la partida vive en MongoDB
+
+- **Qué se decidió:** el estado de cada partida se guarda en la colección `partidas` (una por usuario) con un número de versión; cada petición carga la partida, la actualiza y la guarda solo si nadie la cambió entretanto (si no, reintenta). «Guardar» deja además la partida en pausa con su fecha.
+- **Por qué:** TODO(alumno). (Contexto: funciona con reinicios y con varias instancias de Cloud Run, igual que las sesiones de D-13).
+- **Estado:** vigente.

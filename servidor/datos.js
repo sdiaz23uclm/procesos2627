@@ -14,6 +14,7 @@ export class BaseDatosMongoDB {
     this.db = null;
     this.usuariosCollection = null;
     this.sesionesCollection = null;
+    this.partidasCollection = null;
   }
 
   async conectar() {
@@ -22,6 +23,8 @@ export class BaseDatosMongoDB {
       this.db = this.client.db('saas_db');
       this.usuariosCollection = this.db.collection('usuarios');
       this.sesionesCollection = this.db.collection('sesiones');
+      this.partidasCollection = this.db.collection('partidas');
+      await this.partidasCollection.createIndex({ email: 1 }, { unique: true });
       // MongoDB borra solo las sesiones cuando llega su fecha de caducidad (índice TTL)
       await this.sesionesCollection.createIndex({ expira: 1 }, { expireAfterSeconds: 0 });
       console.log('Conectado exitosamente a MongoDB Atlas');
@@ -88,5 +91,33 @@ export class BaseDatosMongoDB {
   async eliminarSesionesDe(email) {
     await this.conectar();
     await this.sesionesCollection.deleteMany({ email });
+  }
+
+  // ---------- Partidas de Alianzas (D-21) ----------
+
+  async obtenerPartida(email) {
+    await this.conectar();
+    return await this.partidasCollection.findOne({ email }, { projection: { _id: 0 } });
+  }
+
+  // Una partida por usuario: una nueva sustituye a la anterior
+  async crearPartida(partida) {
+    await this.conectar();
+    await this.partidasCollection.replaceOne({ email: partida.email }, partida, { upsert: true });
+  }
+
+  // Solo guarda si la versión en BD sigue siendo la que se leyó (control optimista)
+  async actualizarPartida(partida, versionAnterior) {
+    await this.conectar();
+    const resultado = await this.partidasCollection.replaceOne(
+      { email: partida.email, version: versionAnterior },
+      partida
+    );
+    return resultado.matchedCount > 0;
+  }
+
+  async eliminarPartida(email) {
+    await this.conectar();
+    await this.partidasCollection.deleteOne({ email });
   }
 }

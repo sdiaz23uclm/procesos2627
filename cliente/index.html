@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SaaS - Gestión de Usuarios</title>
+    <title>Alianzas</title>
+    <link rel="stylesheet" href="juego.css">
     <style>
         :root {
             --primary: #4f46e5;
@@ -171,8 +172,8 @@
 <body>
 
     <header>
-        <h1>CloudSaaS Platform</h1>
-        <p class="subtitle">Gestión avanzada de usuarios y arquitectura en capas</p>
+        <h1>Alianzas</h1>
+        <p class="subtitle">Estrategia rápida por turnos de 10 segundos</p>
     </header>
 
     <div class="container">
@@ -217,6 +218,9 @@
             <p id="reg-success" class="success"></p>
         </div>
 
+        <!-- VISTA DEL JUEGO (la dibuja juego.js) -->
+        <div id="game-view" class="vista"></div>
+
         <!-- VISTA DEL PANEL PRIVADO -->
         <div id="dashboard-view" class="vista">
             <h2>Panel de Control</h2>
@@ -224,6 +228,8 @@
                 <p><strong>Usuario:</strong> <span id="user-email"></span></p>
                 <p><strong>Rol:</strong> <span id="user-role" style="text-transform: uppercase; font-weight: bold; color: var(--primary);"></span></p>
             </div>
+
+            <button id="play-btn" style="background-color: #16a34a;">Jugar a Alianzas</button>
 
             <!-- Sección exclusiva para administradores (el servidor también lo comprueba) -->
             <div id="admin-section" style="display: none; margin-top: 20px;">
@@ -250,6 +256,7 @@
 
     <!-- Importamos el cliente de comunicación -->
     <script src="rest.js"></script>
+    <script src="juego.js"></script>
     <script>
         const authView = document.getElementById('auth-view');
         const dashboardView = document.getElementById('dashboard-view');
@@ -257,10 +264,27 @@
         const userRoleSpan = document.getElementById('user-role');
         const adminSection = document.getElementById('admin-section');
 
+        const gameView = document.getElementById('game-view');
+        const contenedor = document.querySelector('.container');
+
         function mostrarVista(vista) {
             authView.classList.remove('activa');
             dashboardView.classList.remove('activa');
+            gameView.classList.remove('activa');
             vista.classList.add('activa');
+            contenedor.classList.toggle('ancho', vista === gameView);
+        }
+
+        function abrirJuego() {
+            mostrarVista(gameView);
+            Juego.abrir(gameView, {
+                alSalir: () => mostrarVista(dashboardView),
+                alPerderSesion: () => {
+                    adminSection.style.display = 'none';
+                    mostrarVista(authView);
+                    document.getElementById('login-error').textContent = 'Tu sesión ha caducado. Inicia sesión de nuevo.';
+                }
+            });
         }
 
         async function verificarSesionInicial() {
@@ -426,6 +450,7 @@
         }
 
         document.getElementById('load-users-btn').addEventListener('click', cargarUsuarios);
+        document.getElementById('play-btn').addEventListener('click', abrirJuego);
 
         document.getElementById('activo-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -460,6 +485,7 @@
             } catch {
                 // aunque falle la red, se vuelve al login: la cookie caducará sola
             }
+            Juego.cerrar();
             adminSection.style.display = 'none';
             document.getElementById('users-container').replaceChildren();
             mostrarVista(authView);
