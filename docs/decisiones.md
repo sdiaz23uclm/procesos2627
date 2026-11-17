@@ -52,3 +52,21 @@ timestamp: 2026-10-28
 - **Qué se decidió:** crear cuentas en estado `pendiente` y rechazar su inicio de sesión mientras mantengan ese estado.
 - **Por qué:** TODO(alumno): ¿qué decisión llevó a dejar pendiente la confirmación por correo en esta versión?
 - **Estado:** vigente.
+
+## D-09 — Brevo como servicio de correo transaccional
+
+- **Qué se decidió:** enviar el correo de confirmación de cuenta (RF-02) mediante la API HTTP de Brevo. El servicio de correo se crea en la composición (`servidor/api.js`) y se inyecta en la lógica, que no conoce HTTP ni Brevo.
+- **Por qué:** TODO(alumno): ¿por qué Brevo frente a Resend o SendGrid?
+- **Estado:** vigente.
+
+## D-10 — Google como proveedor OAuth
+
+- **Qué se decidió:** implementar el inicio de sesión externo (RF-04) con OAuth 2.0 de Google (flujo de código de autorización), sin librerías de terceros.
+- **Por qué:** TODO(alumno): ¿por qué Google frente a GitHub?
+- **Estado:** vigente.
+
+## D-11 — Vincular cuentas cuando el email OAuth ya existe
+
+- **Qué se decidió:** si un usuario entra con Google y ya hay una cuenta local con ese email, se inicia sesión en la cuenta existente y, si estaba `pendiente`, pasa a `confirmado`.
+- **Por qué:** TODO(alumno): ¿por qué vincular en lugar de rechazar?
+- **Estado:** vigente.
