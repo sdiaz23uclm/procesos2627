@@ -191,6 +191,18 @@ const Juego = (() => {
     }
   }
 
+  async function reiniciar(preguntar = true) {
+    if (preguntar && !confirm('¿Reiniciar la partida? Empezarás de cero con el mismo país y se perderá la partida actual.')) return;
+    try {
+      cerrarMenu();
+      ui = null; // la partida nueva puede tener otro tamaño o países: se rehace la estructura
+      actualizar(await RestClient.reiniciarPartida());
+      mensaje('Partida reiniciada. ¡Tu turno está abierto!', true);
+    } catch (err) {
+      tratarError(err);
+    }
+  }
+
   async function reanudar() {
     try {
       actualizar(await RestClient.reanudarPartida());
@@ -310,6 +322,7 @@ const Juego = (() => {
           ? el('button', { text: 'Reanudar', onclick: reanudar })
           : el('button', { class: 'btn-sec', text: 'Guardar y pausar', onclick: guardar }))
         : el('button', { text: 'Nueva partida', onclick: () => dibujarSeleccion(p) }),
+      p.estado === 'en_curso' ? el('button', { class: 'btn-aviso', text: '↻ Reiniciar', onclick: () => reiniciar(true) }) : null,
       el('button', { class: 'btn-sec', text: 'Salir', onclick: salir }),
     );
   }
@@ -359,7 +372,10 @@ const Juego = (() => {
         ui.capa = el('div', { class: 'capa' }, [
           el('h3', { text: p.resultado === 'victoria' ? '¡Victoria!' : 'Derrota' }),
           el('p', { text: p.resultado === 'victoria' ? 'Tu país es el último en pie.' : (p.ganador ? `Gana ${p.ganador}.` : 'Tu país ha sido eliminado.') }),
-          el('button', { text: 'Nueva partida', onclick: () => dibujarSeleccion(p) }),
+          el('div', { class: 'juego-botones' }, [
+            el('button', { text: '↻ Jugar otra vez con el mismo país', onclick: () => reiniciar(false) }),
+            el('button', { class: 'btn-sec', text: 'Elegir otro país', onclick: () => dibujarSeleccion(p) }),
+          ]),
         ]);
       } else if (p.pausada) {
         ui.capa = el('div', { class: 'capa' }, [

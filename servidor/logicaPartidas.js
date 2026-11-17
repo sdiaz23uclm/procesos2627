@@ -41,6 +41,17 @@ export class LogicaPartidas {
     return this.vista(doc);
   }
 
+  // Botón «Reiniciar»: partida nueva con el mismo país
+  async reiniciar(email) {
+    const doc = await this.dao.obtenerPartida(email);
+    if (!doc) {
+      throw errorJuego('PARTIDA_NO_ENCONTRADA', 'No tienes ninguna partida. Empieza una nueva.');
+    }
+    const pais = doc.estado.jugadores.find(j => j.humano).id;
+    console.log(`[LOG] ${email} reinicia su partida de Alianzas`);
+    return await this.nuevaPartida(email, pais);
+  }
+
   // Devuelve la partida del usuario tras avanzar su reloj; null si no tiene ninguna
   async consultar(email) {
     const doc = await this.dao.obtenerPartida(email);

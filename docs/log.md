@@ -2,6 +2,7 @@
 
 Del evento más reciente al más antiguo. Las referencias enlazan a commits y PR de este repositorio. Se consultó la lista de PR y el detalle de cada uno: los PR #1–#11 están integrados.
 
+- 2026-11-17 · Rama `feature/reiniciar-y-admin`: botón «Reiniciar partida», panel de administración visible arriba con la lista cargada, y promoción a admin al iniciar sesión · PR por abrir
 - 2026-11-17 · Rama `feature/alianzas-ajustes`: ciclos de 30 s con turno de 10 s (D-22), radio en cruz (D-23), tutorial, pestañas de acceso y nuevo estilo · PR por abrir
 - 2026-11-17 · Rama `feature/alianzas-base`: primera versión jugable de Alianzas (1 jugador contra 3 IAs, guardado en MongoDB) · PR por abrir
 - 2026-11-17 · Rama `feature/cierre-hito-4`: borrado lógico (D-12), sesiones en MongoDB (D-13), consulta de actividad para el administrador, manejo de errores y README · PR por abrir
