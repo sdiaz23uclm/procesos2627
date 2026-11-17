@@ -220,3 +220,56 @@ test('15. El login de una cuenta pendiente devuelve el código CUENTA_PENDIENTE'
   await logica.registrarUsuario('pend@test.com', '123456');
   await assert.rejects(() => logica.loginUsuario('pend@test.com', '123456'), { codigo: 'CUENTA_PENDIENTE' });
 });
+
+// --- RF-04: inicio de sesión con OAuth (la lógica recibe un email ya verificado por el proveedor) ---
+
+test('16. OAuth con un email nuevo crea un usuario activo sin contraseña y sin enviar correo', async () => {
+  const u = await logica.loginOAuth('Google@Test.com');
+  assert.strictEqual(u.email, 'google@test.com');
+  assert.strictEqual(u.estado, 'oauth');
+  assert.strictEqual(u.rol, 'usuario');
+  assert.strictEqual(u.passwordHash, null);
+  assert.strictEqual(await logica.comprobarActivo('google@test.com'), true);
+  assert.strictEqual(correo.enviados.length, 0);
+});
+
+test('17. OAuth sobre una cuenta local pendiente la vincula y la confirma (D-11)', async () => {
+  const local = await logica.registrarUsuario('mixto@test.com', 'Password123*');
+  const hashOriginal = local.passwordHash;
+  const tokenPendiente = correo.ultimoToken();
+
+  const u = await logica.loginOAuth('mixto@test.com');
+  assert.strictEqual(u.estado, 'confirmado');
+  assert.strictEqual(daoMock.usuarios.length, 1);
+  // Conserva su contraseña: puede seguir entrando también en local
+  assert.strictEqual(u.passwordHash, hashOriginal);
+  await logica.loginUsuario('mixto@test.com', 'Password123*');
+  // El enlace de confirmación pendiente deja de valer
+  await assert.rejects(() => logica.confirmarCuenta(tokenPendiente), { codigo: 'TOKEN_INVALIDO' });
+});
+
+test('18. OAuth repetido con el mismo email no duplica el usuario', async () => {
+  await logica.loginOAuth('repe@test.com');
+  await logica.loginOAuth('repe@test.com');
+  assert.strictEqual(daoMock.usuarios.length, 1);
+});
+
+test('19. OAuth con el email de ADMIN_EMAIL crea la cuenta con rol admin', async () => {
+  const anterior = process.env.ADMIN_EMAIL;
+  process.env.ADMIN_EMAIL = 'jefe@test.com';
+  try {
+    const u = await logica.loginOAuth('jefe@test.com');
+    assert.strictEqual(u.rol, 'admin');
+  } finally {
+    if (anterior === undefined) delete process.env.ADMIN_EMAIL; else process.env.ADMIN_EMAIL = anterior;
+  }
+});
+
+test('20. Error al hacer login local en una cuenta creada con Google', async () => {
+  await logica.loginOAuth('solo-google@test.com');
+  await assert.rejects(() => logica.loginUsuario('solo-google@test.com', 'loquesea'), { codigo: 'CUENTA_OAUTH' });
+});
+
+test('21. Error si OAuth entrega un email no válido', async () => {
+  await assert.rejects(() => logica.loginOAuth(undefined), /EMAIL_INVALIDO/);
+});
