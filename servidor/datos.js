@@ -36,6 +36,17 @@ export class BaseDatosMongoDB {
     return await this.usuariosCollection.find({}).toArray();
   }
 
+  async obtenerPorTokenConfirmacion(tokenHash) {
+    await this.conectar();
+    return await this.usuariosCollection.findOne({ tokenConfirmacionHash: tokenHash });
+  }
+
+  async actualizar(email, cambios) {
+    await this.conectar();
+    const resultado = await this.usuariosCollection.updateOne({ email }, { $set: cambios });
+    return resultado.matchedCount > 0;
+  }
+
   async eliminar(email) {
     await this.conectar();
     const resultado = await this.usuariosCollection.deleteOne({ email });

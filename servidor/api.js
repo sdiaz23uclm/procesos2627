@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { BaseDatosMongoDB } from './datos.js';
 import { LogicaUsuarios, normalizarEmail } from './logica.js';
+import { ServicioCorreoBrevo } from './correo.js';
 
 // Cargar variables de entorno del archivo .env
 dotenv.config();
@@ -12,8 +13,14 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Composición: aquí se crean los servicios externos y se inyectan en la lógica
 const dao = new BaseDatosMongoDB();
-const logica = new LogicaUsuarios(dao);
+const servicioCorreo = new ServicioCorreoBrevo({
+  apiKey: process.env.BREVO_API_KEY,
+  remitente: process.env.MAIL_FROM,
+  urlApp: process.env.APP_URL,
+});
+const logica = new LogicaUsuarios(dao, servicioCorreo);
 const PORT = process.env.PORT || 8080;
 
 // Almacenamiento simple de sesiones en memoria
@@ -27,6 +34,13 @@ function parsearCookies(req) {
     list[parts.shift().trim()] = decodeURI(parts.join('='));
   });
   return list;
+}
+
+// Traduce errores internos a mensajes comprensibles para el usuario
+function mensajeError(err) {
+  if (err instanceof SyntaxError) return 'La petición no tiene un formato válido.';
+  if (err.message === 'EMAIL_INVALIDO') return 'El email no es válido.';
+  return err.message;
 }
 
 // Función auxiliar para verificar si la petición tiene una sesión válida
@@ -89,10 +103,10 @@ const server = http.createServer(async (req, res) => {
           const { email, password } = JSON.parse(body);
           await logica.registrarUsuario(email, password);
           res.writeHead(201);
-          res.end(JSON.stringify({ mensaje: 'Usuario registrado con éxito' }));
+          res.end(JSON.stringify({ mensaje: 'Registro completado. Te hemos enviado un correo para confirmar la cuenta (revisa también la carpeta de spam).' }));
         } catch (err) {
-          res.writeHead(400);
-          res.end(JSON.stringify({ mensaje: err.message }));
+          res.writeHead(err.codigo === 'CORREO_NO_ENVIADO' ? 502 : 400);
+          res.end(JSON.stringify({ mensaje: mensajeError(err), codigo: err.codigo }));
         }
       });
       return;
@@ -115,7 +129,40 @@ const server = http.createServer(async (req, res) => {
           res.end(JSON.stringify({ email: usuario.email, rol: usuario.rol }));
         } catch (err) {
           res.writeHead(401);
-          res.end(JSON.stringify({ mensaje: err.message }));
+          res.end(JSON.stringify({ mensaje: mensajeError(err), codigo: err.codigo }));
+        }
+      });
+      return;
+    }
+
+    // CONFIRMAR CUENTA (enlace del correo, RF-02)
+    if (pathname === '/api/confirmar' && req.method === 'GET') {
+      let destino;
+      try {
+        await logica.confirmarCuenta(urlObj.searchParams.get('token'));
+        destino = '/?confirmacion=ok';
+      } catch (err) {
+        const motivo = err.codigo === 'TOKEN_CADUCADO' ? 'caducado' : 'invalido';
+        destino = `/?confirmacion=${motivo}`;
+      }
+      res.writeHead(302, { Location: destino });
+      res.end();
+      return;
+    }
+
+    // REENVIAR CORREO DE CONFIRMACIÓN
+    if (pathname === '/api/reenviar-confirmacion' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', async () => {
+        try {
+          const { email } = JSON.parse(body);
+          await logica.reenviarConfirmacion(email);
+          res.writeHead(200);
+          res.end(JSON.stringify({ mensaje: 'Si la cuenta existe y está pendiente, te hemos enviado un nuevo correo de confirmación.' }));
+        } catch (err) {
+          res.writeHead(err.codigo === 'CORREO_NO_ENVIADO' ? 502 : 400);
+          res.end(JSON.stringify({ mensaje: mensajeError(err), codigo: err.codigo }));
         }
       });
       return;
