@@ -43,6 +43,11 @@ function rolPara(emailNormalizado, rolPorDefecto = 'usuario') {
   return (adminEmailConfig && emailNormalizado === adminEmailConfig.trim().toLowerCase()) ? 'admin' : rolPorDefecto;
 }
 
+// Activo = confirmó su correo o entró con OAuth, y no está eliminado (apartado 4.2)
+function esActivo(usuario) {
+  return !!usuario && (usuario.estado === 'confirmado' || usuario.estado === 'oauth');
+}
+
 export class LogicaUsuarios {
   /**
    * @param dao            capa de acceso a datos
@@ -218,40 +223,61 @@ export class LogicaUsuarios {
   }
 
   async listarUsuarios(usuarioActual) {
-    if (!usuarioActual || usuarioActual.rol !== 'admin') {
-      console.log(`[LOG] Acceso denegado a listado de usuarios para: ${usuarioActual?.email || 'anónimo'}`);
-      throw new Error("Acceso denegado: Se requiere rol de administrador");
-    }
+    this.exigirAdmin(usuarioActual, 'listado de usuarios');
     console.log(`[LOG] El administrador ${usuarioActual.email} ha listado los usuarios.`);
-    return await this.dao.obtenerTodos();
+    const usuarios = await this.dao.obtenerTodos();
+    // Solo datos públicos: nunca se devuelven hashes de contraseña ni de tokens
+    return usuarios.map(u => ({ email: u.email, rol: u.rol, estado: u.estado, activo: esActivo(u) }));
   }
 
   async comprobarActivo(email) {
     const emailNormalizado = normalizarEmail(email);
     const u = await this.dao.obtenerPorEmail(emailNormalizado);
-    if (!u) return false;
-    return u.estado === "confirmado" || u.estado === "oauth";
+    return esActivo(u);
   }
 
+  // RF-08: consulta de actividad, reservada al administrador
+  async consultarActivo(usuarioActual, email) {
+    this.exigirAdmin(usuarioActual, 'consulta de actividad');
+    const emailNormalizado = normalizarEmail(email);
+    const activo = await this.comprobarActivo(emailNormalizado);
+    console.log(`[LOG] El administrador ${usuarioActual.email} consultó si ${emailNormalizado} está activo: ${activo}`);
+    return { email: emailNormalizado, activo };
+  }
+
+  // RF-09 con borrado lógico (D-12): la cuenta queda 'eliminado' y deja de encontrarse por email
   async eliminarUsuario(emailSolicitante, emailTarget) {
     const solicitanteNormalizado = normalizarEmail(emailSolicitante);
     const emailTargetNormalizado = normalizarEmail(emailTarget);
     const solicitante = await this.dao.obtenerPorEmail(solicitanteNormalizado);
     if (!solicitante) {
-      throw new Error("Usuario solicitante no válido");
+      throw errorNegocio('NO_AUTENTICADO', 'Usuario solicitante no válido');
     }
 
     const esAdmin = solicitante.rol === 'admin';
 
     if (!esAdmin && solicitanteNormalizado !== emailTargetNormalizado) {
       console.log(`[LOG] El usuario ${solicitanteNormalizado} intentó eliminar a ${emailTargetNormalizado} sin permisos.`);
-      throw new Error("No tienes permisos para eliminar este usuario");
+      throw errorNegocio('SIN_PERMISOS', 'No tienes permisos para eliminar este usuario');
     }
 
-    const eliminado = await this.dao.eliminar(emailTargetNormalizado);
-    if (eliminado) {
-      console.log(`[LOG] Usuario eliminado: ${emailTargetNormalizado} (por acción de ${solicitanteNormalizado})`);
+    const eliminado = await this.dao.actualizar(emailTargetNormalizado, {
+      estado: 'eliminado',
+      eliminadoEn: new Date(this.reloj()),
+      tokenConfirmacionHash: null,
+      tokenConfirmacionExpira: null,
+    });
+    if (!eliminado) {
+      throw errorNegocio('USUARIO_NO_ENCONTRADO', 'El usuario no existe o ya estaba eliminado');
     }
-    return eliminado;
+    console.log(`[LOG] Usuario eliminado: ${emailTargetNormalizado} (por acción de ${solicitanteNormalizado})`);
+    return true;
+  }
+
+  exigirAdmin(usuarioActual, accion) {
+    if (!usuarioActual || usuarioActual.rol !== 'admin') {
+      console.log(`[LOG] Acceso denegado a ${accion} para: ${usuarioActual?.email || 'anónimo'}`);
+      throw errorNegocio('SIN_PERMISOS', 'Acceso denegado: Se requiere rol de administrador');
+    }
   }
 }

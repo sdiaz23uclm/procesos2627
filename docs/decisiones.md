@@ -39,7 +39,7 @@ timestamp: 2026-10-28
 
 - **Qué se decidió:** mantener un `Map` de sesiones en `servidor/api.js` y usar una cookie `sessionId`.
 - **Por qué:** TODO(alumno): ¿por qué se eligió guardar las sesiones en memoria del proceso?
-- **Estado:** vigente.
+- **Estado:** sustituida por D-13.
 
 ## D-07 — Normalizar el email
 
@@ -70,3 +70,15 @@ timestamp: 2026-10-28
 - **Qué se decidió:** si un usuario entra con Google y ya hay una cuenta local con ese email, se inicia sesión en la cuenta existente y, si estaba `pendiente`, pasa a `confirmado`.
 - **Por qué:** TODO(alumno): ¿por qué vincular en lugar de rechazar?
 - **Estado:** vigente.
+
+## D-12 — Borrado lógico de usuarios, con posibilidad de volver a registrarse
+
+- **Qué se decidió:** eliminar un usuario no borra su documento: se marca con estado `eliminado` y fecha `eliminadoEn`. La cuenta eliminada no puede iniciar sesión (ni local ni con Google) y sus sesiones se cierran. Las búsquedas por email ignoran las cuentas eliminadas, así que el mismo email puede registrarse de nuevo y obtiene una cuenta nueva; la antigua sigue en la base de datos como `eliminado`.
+- **Por qué:** TODO(alumno): ¿por qué borrado lógico y por qué permitir volver a registrarse?
+- **Estado:** vigente. Sustituye al borrado físico implícito en D-03.
+
+## D-13 — Sesiones persistidas en MongoDB
+
+- **Qué se decidió:** guardar las sesiones en la colección `sesiones` de MongoDB (hash del identificador, email y caducidad de 7 días con índice TTL) en lugar del `Map` en memoria.
+- **Por qué:** TODO(alumno): (pista: reinicios y varias instancias en Cloud Run).
+- **Estado:** vigente. Sustituye a D-06.

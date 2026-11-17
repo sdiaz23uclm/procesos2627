@@ -225,14 +225,26 @@
                 <p><strong>Rol:</strong> <span id="user-role" style="text-transform: uppercase; font-weight: bold; color: var(--primary);"></span></p>
             </div>
 
-            <!-- Sección exclusiva para administradores -->
+            <!-- Sección exclusiva para administradores (el servidor también lo comprueba) -->
             <div id="admin-section" style="display: none; margin-top: 20px;">
                 <h3>Panel de Administración</h3>
                 <button id="load-users-btn" style="background-color: #0284c7;">Listar Usuarios del Sistema</button>
                 <div id="users-container" style="overflow-x: auto;"></div>
+
+                <form id="activo-form" style="margin-top: 20px;">
+                    <div class="form-group">
+                        <label for="activo-email">Comprobar si un usuario está activo</label>
+                        <input type="email" id="activo-email" required placeholder="usuario@email.com">
+                    </div>
+                    <button type="submit" style="background-color: #0284c7;">Comprobar</button>
+                </form>
+                <p id="activo-resultado"></p>
+                <p id="admin-msg"></p>
             </div>
 
-            <button id="logout-btn" class="btn-danger" style="margin-top: 20px;">Cerrar Sesión</button>
+            <button id="logout-btn" style="margin-top: 20px;">Cerrar Sesión</button>
+            <button id="delete-self-btn" class="btn-danger">Eliminar mi cuenta</button>
+            <p id="dashboard-error" class="error"></p>
         </div>
     </div>
 
@@ -350,27 +362,106 @@
             }
         });
 
-        // Botón para listar usuarios (Solo Admin)
-        document.getElementById('load-users-btn')?.addEventListener('click', async () => {
+        function mostrarMensaje(id, texto, ok) {
+            const el = document.getElementById(id);
+            el.className = ok ? 'success' : 'error';
+            el.textContent = texto;
+        }
+
+        // Si el servidor dice que la sesión ya no vale, se vuelve a la pantalla de login
+        function sesionPerdida(err) {
+            if (err.estado === 401) {
+                adminSection.style.display = 'none';
+                mostrarVista(authView);
+                document.getElementById('login-error').textContent = 'Tu sesión ha caducado. Inicia sesión de nuevo.';
+                return true;
+            }
+            return false;
+        }
+
+        // Listado de usuarios (solo admin). Se construye con textContent para no interpretar HTML de los datos.
+        async function cargarUsuarios() {
+            const contenedor = document.getElementById('users-container');
             try {
-                const respuesta = await fetch('/api/usuarios');
-                if (!respuesta.ok) throw new Error('No autorizado para ver la lista');
-                const usuarios = await respuesta.json();
-                
-                let html = '<table><thead><tr><th>Email</th><th>Rol</th><th>Estado</th></tr></thead><tbody>';
+                const usuarios = await RestClient.listarUsuarios();
+                const tabla = document.createElement('table');
+                tabla.innerHTML = '<thead><tr><th>Email</th><th>Rol</th><th>Estado</th><th>Activo</th><th></th></tr></thead>';
+                const cuerpo = document.createElement('tbody');
                 usuarios.forEach(u => {
-                    html += `<tr><td>${u.email}</td><td>${u.rol}</td><td>${u.estado}</td></tr>`;
+                    const fila = document.createElement('tr');
+                    [u.email, u.rol, u.estado, u.activo ? 'Sí' : 'No'].forEach(valor => {
+                        const celda = document.createElement('td');
+                        celda.textContent = valor;
+                        fila.appendChild(celda);
+                    });
+                    const celdaAccion = document.createElement('td');
+                    if (u.estado !== 'eliminado' && u.email !== userEmailSpan.textContent) {
+                        const boton = document.createElement('button');
+                        boton.className = 'btn-danger';
+                        boton.style.margin = '0';
+                        boton.style.padding = '4px 8px';
+                        boton.textContent = 'Eliminar';
+                        boton.addEventListener('click', () => eliminarUsuario(u.email));
+                        celdaAccion.appendChild(boton);
+                    }
+                    fila.appendChild(celdaAccion);
+                    cuerpo.appendChild(fila);
                 });
-                html += '</tbody></table>';
-                document.getElementById('users-container').innerHTML = html;
+                tabla.appendChild(cuerpo);
+                contenedor.replaceChildren(tabla);
             } catch (err) {
-                alert(err.message);
+                if (!sesionPerdida(err)) mostrarMensaje('admin-msg', err.message, false);
+            }
+        }
+
+        async function eliminarUsuario(email) {
+            if (!confirm(`¿Seguro que quieres eliminar la cuenta ${email}? No podrá volver a iniciar sesión.`)) return;
+            try {
+                await RestClient.eliminarUsuario(email);
+                mostrarMensaje('admin-msg', `Cuenta ${email} eliminada.`, true);
+                await cargarUsuarios();
+            } catch (err) {
+                if (!sesionPerdida(err)) mostrarMensaje('admin-msg', err.message, false);
+            }
+        }
+
+        document.getElementById('load-users-btn').addEventListener('click', cargarUsuarios);
+
+        document.getElementById('activo-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('activo-email').value;
+            try {
+                const res = await RestClient.consultarActivo(email);
+                mostrarMensaje('activo-resultado', `${res.email}: ${res.activo ? 'ACTIVO' : 'NO activo (pendiente, eliminado o inexistente)'}`, res.activo);
+            } catch (err) {
+                if (!sesionPerdida(err)) mostrarMensaje('activo-resultado', err.message, false);
+            }
+        });
+
+        document.getElementById('delete-self-btn').addEventListener('click', async () => {
+            const email = userEmailSpan.textContent;
+            if (!confirm('¿Seguro que quieres eliminar tu cuenta? Esta acción no se puede deshacer.')) return;
+            try {
+                await RestClient.eliminarUsuario(email);
+                adminSection.style.display = 'none';
+                mostrarVista(authView);
+                const msg = document.getElementById('confirmacion-msg');
+                msg.className = 'aviso ok';
+                msg.textContent = 'Tu cuenta se ha eliminado.';
+                msg.style.display = 'block';
+            } catch (err) {
+                if (!sesionPerdida(err)) mostrarMensaje('dashboard-error', err.message, false);
             }
         });
 
         document.getElementById('logout-btn').addEventListener('click', async () => {
-            await RestClient.logout();
+            try {
+                await RestClient.logout();
+            } catch {
+                // aunque falle la red, se vuelve al login: la cookie caducará sola
+            }
             adminSection.style.display = 'none';
+            document.getElementById('users-container').replaceChildren();
             mostrarVista(authView);
         });
 

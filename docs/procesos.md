@@ -2,7 +2,7 @@
 type: Proceso
 title: Flujo de trabajo, CI y despliegue
 description: Evidencia comprobable del proceso Git y del workflow del repositorio.
-timestamp: 2026-10-28
+timestamp: 2026-11-17
 ---
 
 ## Flujo de trabajo
@@ -23,4 +23,10 @@ La lista del [workflow en GitHub Actions](https://github.com/sdiaz23uclm/proceso
 
 ## Despliegue continuo
 
-El workflow revisado no incluye un paso de despliegue. Tampoco se encontró en los archivos del repositorio una URL pública o configuración del proveedor cloud. No se puede determinar desde este checkout si existe integración de despliegue configurada externamente: **Por verificar** en la configuración del proveedor y en GitHub.
+La aplicación se despliega en Google Cloud Run (servicio `procesos26-27`, región `europe-southwest1`), accesible en https://procesos26-27-1061448815388.europe-southwest1.run.app. Cloud Run está conectado al repositorio de GitHub y compila y despliega automáticamente cada cambio que llega a `main`; las ejecuciones aparecen en «Historial de compilaciones» del servicio. Esta configuración vive en Google Cloud, no en el repositorio, y el despliegue no espera al resultado del CI (la especificación lo permite).
+
+Las variables de entorno se configuran una vez en el servicio y las heredan todas las revisiones: `APP_URL`, `MAIL_FROM`, `ADMIN_EMAIL` y `GOOGLE_CLIENT_ID` como variables normales; `MONGODB_URI`, `BREVO_API_KEY` y `GOOGLE_CLIENT_SECRET` como referencias a Secret Manager. La cuenta de servicio de Cloud Run necesita el rol «Descriptor de acceso a secretos de Secret Manager»: sin él, la revisión falla al crearse (incidencia encontrada y resuelta el 2026-11-17).
+
+## Hito 4: flujo seguido
+
+Cada requisito se desarrolló en su propia rama con la decisión de diseño como primer commit (`docs/decisiones.md`), pruebas en local con `npm test` y PR contra `main`: `feature/RF-02-confirmacion-correo`, `feature/RF-04-oauth-google` y `feature/cierre-hito-4`. Por verificar: números de PR y ejecuciones del CI de cada rama.
