@@ -150,11 +150,17 @@ export class LogicaUsuarios {
       return;
     }
 
+    // Conservar el enlace anterior si falla el envío (#22)
+    const tokenAnterior = {
+      tokenConfirmacionHash: usuario.tokenConfirmacionHash,
+      tokenConfirmacionExpira: usuario.tokenConfirmacionExpira,
+    };
     const { token, campos } = this.generarTokenConfirmacion();
     await this.dao.actualizar(emailNormalizado, campos);
     try {
       await this.correo.enviarConfirmacion(emailNormalizado, token);
     } catch (err) {
+      await this.dao.actualizar(emailNormalizado, tokenAnterior);
       console.log(`[LOG] Fallo al reenviar el correo a ${emailNormalizado}: ${err.message}`);
       throw errorNegocio('CORREO_NO_ENVIADO', 'No se pudo enviar el correo de confirmación. Inténtalo de nuevo más tarde.');
     }
