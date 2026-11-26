@@ -389,3 +389,29 @@ test('32. Iniciar sesión no da rol admin a quien no coincide con ADMIN_EMAIL', 
     if (anterior === undefined) delete process.env.ADMIN_EMAIL; else process.env.ADMIN_EMAIL = anterior;
   }
 });
+
+test('33. Si falla el reenvío, el enlace original sigue siendo válido (#22)', async () => {
+  await logica.registrarUsuario('reenvio-fallido@test.com', '123456');
+  const tokenViejo = correo.ultimoToken();
+  const usuario = await daoMock.obtenerPorEmail('reenvio-fallido@test.com');
+  const hashViejo = usuario.tokenConfirmacionHash;
+  const caducidadVieja = usuario.tokenConfirmacionExpira;
+
+  correo.fallar = true;
+  await assert.rejects(() => logica.reenviarConfirmacion('reenvio-fallido@test.com'), { codigo: 'CORREO_NO_ENVIADO' });
+
+  // El token se conserva en BD y el enlace que ya tenía el usuario sigue confirmando
+  const despues = await daoMock.obtenerPorEmail('reenvio-fallido@test.com');
+  assert.strictEqual(despues.tokenConfirmacionHash, hashViejo);
+  assert.strictEqual(despues.tokenConfirmacionExpira, caducidadVieja);
+  await logica.confirmarCuenta(tokenViejo);
+  assert.strictEqual((await daoMock.obtenerPorEmail('reenvio-fallido@test.com')).estado, 'confirmado');
+
+  // Un reenvío correcto sigue invalidando el enlace anterior (prueba 13)
+  correo.fallar = false;
+  await logica.registrarUsuario('reenvio-ok@test.com', '123456');
+  const tokenAnterior = correo.ultimoToken();
+  await logica.reenviarConfirmacion('reenvio-ok@test.com');
+  await assert.rejects(() => logica.confirmarCuenta(tokenAnterior), { codigo: 'TOKEN_INVALIDO' });
+  await logica.confirmarCuenta(correo.ultimoToken());
+});
